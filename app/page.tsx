@@ -15,8 +15,7 @@ export default function Home() {
         <h1 className="mt-2 text-4xl font-semibold">Salesroom</h1>
         <p className="mt-4 max-w-xl text-brand-100">
           Curate everything a buyer needs in one branded room — and see exactly
-          who consumed what. This is the P0 backend spine; the seller and buyer
-          portals build on top of it.
+          who consumed what.
         </p>
       </div>
 
@@ -27,16 +26,17 @@ export default function Home() {
         >
           <h2 className="text-lg font-semibold">Seller Portal</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Reps sign in, pick an account, and curate a room. (Coming in P1.)
+            Reps sign in, pick an account, and curate a room.
           </p>
         </Link>
         <Link
-          href="/room"
+          href="/login"
           className="rounded-xl border border-slate-200 bg-white p-6 transition hover:border-brand-400 hover:shadow"
         >
           <h2 className="text-lg font-semibold">Buyer Portal</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Buyers open their room and consume content. (Coming in P2.)
+            Buyers open the room link shared by their rep (/room/&lt;slug&gt;).
+            Sign in here.
           </p>
         </Link>
       </div>
