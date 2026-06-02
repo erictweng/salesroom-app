@@ -1,5 +1,10 @@
 import Link from "next/link";
 
+/**
+ * Public landing page with entry points into the two portals. Buyers normally
+ * arrive via a direct room link (/room/[slug], P2); this is mainly a dev/demo
+ * jumping-off point.
+ */
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center gap-8 px-6 py-16">

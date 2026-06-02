@@ -1,6 +1,11 @@
 import { logoutAction } from "@/server/actions";
 import type { CrmUser } from "@/lib/types";
 
+/**
+ * Top chrome for every seller page. Mirrors the buyer portal's branded header so
+ * the two experiences feel like one product. Sign-out posts to a server action
+ * (logoutAction) which clears the httpOnly session cookie server-side.
+ */
 export function SellerHeader({ user }: { user: CrmUser }) {
   return (
     <header className="brand-hero text-white">

@@ -3,6 +3,11 @@ import { login } from "@/lib/crm";
 import { setSession } from "@/lib/session";
 import { json, error, toErrorResponse } from "@/lib/http";
 
+/**
+ * Authenticate against the CRM and start a session. The CRM token is stored in
+ * an httpOnly cookie and deliberately NOT returned in the response body — only
+ * the safe-to-expose user object goes back to the client.
+ */
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {

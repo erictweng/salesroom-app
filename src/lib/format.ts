@@ -1,11 +1,17 @@
-/** Small, dependency-free formatting helpers shared across UI components. */
+/**
+ * Small, dependency-free formatting helpers shared across UI components.
+ * Convention: when given missing/invalid input these return an em dash ("—")
+ * so callers can render them directly without null-checking.
+ */
 
+/** First initials of a name, e.g. ("David","Park") -> "DP"; "?" if both blank. */
 export function initials(first?: string, last?: string): string {
   const a = (first ?? "").trim()[0] ?? "";
   const b = (last ?? "").trim()[0] ?? "";
   return (a + b).toUpperCase() || "?";
 }
 
+/** Currency amount (no decimals). Falls back to a plain "$" string if Intl throws. */
 export function formatAmount(
   amount?: number | null,
   currency = "USD",
@@ -22,6 +28,7 @@ export function formatAmount(
   }
 }
 
+/** ISO timestamp -> "Mar 5, 2026"; "—" for null/invalid dates. */
 export function formatDate(iso?: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);

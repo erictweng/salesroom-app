@@ -4,8 +4,15 @@ import { createRoomAction } from "@/server/actions";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 
+// Account-scoped room state lives in our DB and CRM data is per-request, so this
+// page must never be statically cached.
 export const dynamic = "force-dynamic";
 
+/**
+ * Account picker. Lists every CRM account the rep can curate, annotated with
+ * whether a room already exists. Each card's button posts to createRoomAction,
+ * which opens the existing room or creates+seeds a new one (one-click flow).
+ */
 export default async function SellerDashboard() {
   const { token } = requireRep();
   const entries = await loadSellerDashboard(token);

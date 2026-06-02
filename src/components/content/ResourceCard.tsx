@@ -4,6 +4,7 @@ import { parseYouTubeId } from "@/lib/youtube";
 import { contentTypeLabel, formatDuration } from "@/lib/format";
 import type { Content } from "@/lib/types";
 
+/** Color-codes each content type so the hub is scannable at a glance. */
 const TYPE_TONE: Record<string, BadgeTone> = {
   video: "red",
   document: "blue",
@@ -11,6 +12,12 @@ const TYPE_TONE: Record<string, BadgeTone> = {
   one_pager: "amber",
 };
 
+/**
+ * A single content tile. Videos with a parseable YouTube id render the inline
+ * player; everything else (docs, case studies, one-pagers) links out to the PDF
+ * served by the CRM. A non-video or unparseable URL degrades to a thumbnail
+ * link rather than a broken player.
+ */
 export function ResourceCard({ content }: { content: Content }) {
   const videoId =
     content.type === "video" ? parseYouTubeId(content.url) : null;

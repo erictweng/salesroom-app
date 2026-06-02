@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
 
+/**
+ * Small pill label (status, role, content type). The tone is a semantic name
+ * rather than a raw color so call sites stay readable and the palette can change
+ * in one place.
+ */
 export type BadgeTone =
   | "slate"
   | "green"

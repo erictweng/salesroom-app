@@ -1,5 +1,10 @@
 import type { ReactNode } from "react";
 
+/**
+ * Placeholder shown when a module has no data (fresh room, no enrichment, no
+ * events). Centralized so every empty surface reads consistently instead of each
+ * module inventing its own "nothing here" markup.
+ */
 export function EmptyState({
   title,
   hint,

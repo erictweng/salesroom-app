@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+/** Title + optional subtitle and right-aligned action, used to head each module. */
 export function SectionHeader({
   title,
   subtitle,

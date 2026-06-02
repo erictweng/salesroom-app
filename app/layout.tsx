@@ -1,3 +1,4 @@
+// Root layout: wraps every route with the base <html>/<body> and global styles.
 import type { Metadata } from "next";
 import "./globals.css";
 

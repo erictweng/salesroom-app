@@ -8,6 +8,12 @@ const DEMO_REPS = [
   "marcus.thompson@salesroom.io",
 ];
 
+/**
+ * Client-side login form. It posts to the /api/auth/login route handler (rather
+ * than a server action) because that handler is what sets the httpOnly session
+ * cookie, and we want inline error feedback (wrong password, server down) plus a
+ * role-aware client redirect after success. The CRM token is never handled here.
+ */
 export function LoginForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");

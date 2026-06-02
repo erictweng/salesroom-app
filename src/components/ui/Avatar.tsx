@@ -1,5 +1,10 @@
 import { initials } from "@/lib/format";
 
+/**
+ * Initials-based avatar. We don't have contact photos from the CRM, so this is a
+ * deterministic, dependency-free stand-in. Marked aria-hidden because the name
+ * is always shown next to it.
+ */
 export function Avatar({
   first,
   last,

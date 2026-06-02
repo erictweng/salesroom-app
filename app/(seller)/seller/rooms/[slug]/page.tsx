@@ -11,6 +11,11 @@ import { ActivityFeed } from "@/components/modules/ActivityFeed";
 
 export const dynamic = "force-dynamic";
 
+/**
+ * The room builder: one stacked page composing the four modules from a single
+ * parallel data load. Unknown slugs 404 (via loadRoomData -> notFound). Modules
+ * are pure components fed by props here, so the same set powers the P2 buyer view.
+ */
 export default async function RoomBuilderPage({
   params,
 }: {
