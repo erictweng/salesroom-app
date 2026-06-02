@@ -20,10 +20,12 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setNotice(null);
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
@@ -33,8 +35,15 @@ export function LoginForm() {
       });
       if (res.ok) {
         const { user } = await res.json();
-        // Reps go to the seller workspace; buyers land on their room (P2).
-        router.push(user?.role === "buyer" ? "/" : "/seller");
+        if (user?.role === "buyer") {
+          // Buyers don't have a generic home — they open a room link from their rep.
+          setNotice(
+            "You're signed in. Buyers open the room link shared by your rep — there's no separate buyer home.",
+          );
+          setLoading(false);
+          return;
+        }
+        router.push("/seller");
         router.refresh();
         return;
       }
@@ -83,6 +92,12 @@ export function LoginForm() {
       {error && (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
           {error}
+        </p>
+      )}
+
+      {notice && (
+        <p className="rounded-md bg-brand-50 px-3 py-2 text-sm text-brand-800">
+          {notice}
         </p>
       )}
 
