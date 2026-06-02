@@ -35,10 +35,21 @@ export async function loadSellerDashboard(
   token: string,
 ): Promise<DashboardEntry[]> {
   const accounts = await listAccounts(token);
-  return accounts.map((account) => ({
+  const entries: DashboardEntry[] = accounts.map((account) => ({
     account,
     room: getRoomByAccount(account.id) ?? null,
   }));
+
+  // Optional: pad with synthetic accounts to stress-test the picker at scale.
+  const demoCount = Number(process.env.DEMO_ACCOUNTS ?? 0);
+  if (Number.isFinite(demoCount) && demoCount > 0) {
+    const { generateDemoAccounts } = await import("@/lib/demoAccounts");
+    for (const account of generateDemoAccounts(demoCount)) {
+      entries.push({ account, room: null });
+    }
+  }
+
+  return entries;
 }
 
 export interface ResourceWithContent extends RoomResource {

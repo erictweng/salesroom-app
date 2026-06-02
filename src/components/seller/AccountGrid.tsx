@@ -297,6 +297,18 @@ function StatusBadge({ room }: { room: DashboardEntry["room"] }) {
 }
 
 function OpenButton({ entry }: { entry: DashboardEntry }) {
+  // Synthetic demo accounts have no real CRM record, so they can't open a room.
+  if (entry.account.id.startsWith("demo_")) {
+    return (
+      <button
+        disabled
+        title="Demo account (no CRM record) — for scale testing only"
+        className="cursor-not-allowed rounded-md border border-slate-200 px-4 py-2 text-sm font-medium text-slate-400"
+      >
+        Demo account
+      </button>
+    );
+  }
   return (
     <form action={createRoomAction}>
       <input type="hidden" name="account_id" value={entry.account.id} />
