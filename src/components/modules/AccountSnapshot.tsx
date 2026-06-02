@@ -1,6 +1,4 @@
-import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import type { Account, Enrichment } from "@/lib/types";
 import type { ReactNode } from "react";
 
@@ -21,7 +19,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Chips({ items }: { items?: string[] | null }) {
-  if (!items || items.length === 0) return <span className="text-sm text-slate-400">—</span>;
+  if (!items || items.length === 0)
+    return <span className="text-sm text-slate-400">—</span>;
   return (
     <div className="flex flex-wrap gap-1.5">
       {items.map((t) => (
@@ -36,7 +35,11 @@ function Chips({ items }: { items?: string[] | null }) {
   );
 }
 
-/** Module A — Account Snapshot. Account + enrichment context, degrades gracefully. */
+/**
+ * Module A — Account Snapshot (bare body; the section chrome/title is supplied by
+ * the surrounding CollapsibleSection). Account + enrichment context, degrades
+ * gracefully when fields or enrichment are missing.
+ */
 export function AccountSnapshot({
   account,
   enrichment,
@@ -45,14 +48,11 @@ export function AccountSnapshot({
   enrichment: Enrichment | null;
 }) {
   return (
-    <Card className="p-6">
-      <SectionHeader
-        title="Account Snapshot"
-        subtitle={val(account.domain) as string}
-        action={
-          <Badge tone="green">ICP fit {account.icp_fit_score ?? "—"}</Badge>
-        }
-      />
+    <div>
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <p className="text-sm text-slate-500">{val(account.domain)}</p>
+        <Badge tone="green">ICP fit {account.icp_fit_score ?? "—"}</Badge>
+      </div>
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
         <Field label="Industry">{val(account.industry)}</Field>
@@ -148,6 +148,6 @@ export function AccountSnapshot({
           No enrichment data available for this account.
         </p>
       )}
-    </Card>
+    </div>
   );
 }

@@ -9,10 +9,14 @@ process.env.DATABASE_PATH = tmp;
 
 const {
   createOrGetRoom,
+  getRoomBySlug,
   listRoomResources,
   listVisibleRoomResources,
   moveResource,
   setResourceHidden,
+  setResourceOrder,
+  setResourceCategory,
+  setSectionOrder,
 } = await import("../repo");
 
 const { room } = createOrGetRoom({
@@ -62,5 +66,32 @@ describe("room resource reorder + hide", () => {
   it("unhides a resource", () => {
     setResourceHidden(room.id, "b", false);
     expect(visible()).toEqual(["a", "b", "c"]);
+  });
+
+  it("applies an explicit drag-and-drop order", () => {
+    setResourceOrder(room.id, ["c", "a", "b"]);
+    expect(order()).toEqual(["c", "a", "b"]);
+    setResourceOrder(room.id, ["a", "b", "c"]); // restore
+    expect(order()).toEqual(["a", "b", "c"]);
+  });
+
+  it("overrides and clears a resource category", () => {
+    setResourceCategory(room.id, "a", "Pricing");
+    expect(
+      listRoomResources(room.id).find((r) => r.content_id === "a")?.category,
+    ).toBe("Pricing");
+    setResourceCategory(room.id, "a", null);
+    expect(
+      listRoomResources(room.id).find((r) => r.content_id === "a")?.category,
+    ).toBeNull();
+  });
+
+  it("saves and clears the per-room section order", () => {
+    setSectionOrder(room.id, ["engagement", "content"]);
+    expect(
+      JSON.parse(getRoomBySlug(room.slug)!.section_order!),
+    ).toEqual(["engagement", "content"]);
+    setSectionOrder(room.id, null);
+    expect(getRoomBySlug(room.slug)!.section_order).toBeNull();
   });
 });

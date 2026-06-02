@@ -1,5 +1,3 @@
-import { Card } from "@/components/ui/Card";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/format";
 import type { EventRecord } from "@/lib/types";
@@ -10,10 +8,7 @@ import type { EventRecord } from "@/lib/types";
  * a raw event code. Title comes from the resolved content map; watch-time/percent
  * come from the event metadata (stored as JSON).
  */
-function describe(
-  e: EventRecord,
-  titles: Record<string, string>,
-): string {
+function describe(e: EventRecord, titles: Record<string, string>): string {
   const who = e.actor_name ?? e.actor_email ?? "Someone";
   const title = e.content_id
     ? (titles[e.content_id] ?? "a resource")
@@ -49,9 +44,8 @@ function describe(
 }
 
 /**
- * Module E — Activity & Engagement Feed. Renders attributed, human-readable
- * lines newest-first. Populated by buyer actions from P2; P3 layers on insights
- * (top stakeholder, most-viewed resource, suggested follow-up).
+ * Activity feed (bare body; section chrome supplied by the wrapper). Attributed,
+ * human-readable lines newest-first; rep preview actions are tagged.
  */
 export function ActivityFeed({
   events,
@@ -61,12 +55,10 @@ export function ActivityFeed({
   contentTitles?: Record<string, string>;
 }) {
   return (
-    <Card className="p-6">
-      <SectionHeader
-        title="Activity & Engagement"
-        subtitle="Live in-room activity from buyers"
-      />
-
+    <div className="mt-4">
+      <h3 className="mb-2 text-sm font-semibold text-slate-700">
+        Recent activity
+      </h3>
       {events.length === 0 ? (
         <EmptyState
           title="No buyer activity yet"
@@ -93,6 +85,6 @@ export function ActivityFeed({
           ))}
         </ul>
       )}
-    </Card>
+    </div>
   );
 }

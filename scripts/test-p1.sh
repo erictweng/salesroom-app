@@ -65,6 +65,18 @@ contains "Module E heading" "Activity &" "$page"
 contains "Champion highlighted" "Champion" "$page"
 contains "CRM score labeled" "CRM score" "$page"
 
+echo "== custom panel order persists + reflects in SSR =="
+node -e 'const D=require("better-sqlite3");const db=new D("./data/salesroom.db");db.prepare("UPDATE rooms SET section_order=? WHERE slug=?").run(JSON.stringify(["engagement","content","snapshot","stakeholders"]), process.argv[1]);' "$slug"
+reordered=$(curl -s -b "$JAR" "$APP/seller/rooms/$slug")
+ord=$(python3 - "$reordered" <<'PY'
+import sys
+h = sys.argv[1]
+ia, ic = h.find("Activity &"), h.find("Content Hub")
+print("OK" if 0 <= ia < ic else "BAD")
+PY
+)
+check "panels render in saved order (Engagement before Content)" "OK" "$ord"
+
 echo "== buyer is blocked from seller routes =="
 curl -s -c "$JARB" -o /dev/null -X POST "$APP/api/auth/login" \
   -H 'Content-Type: application/json' \

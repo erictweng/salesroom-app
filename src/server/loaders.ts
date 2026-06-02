@@ -43,6 +43,18 @@ export async function loadSellerDashboard(
 
 export interface ResourceWithContent extends RoomResource {
   content: Content;
+  /** Per-room category override if set, else the content's CRM category. */
+  effectiveCategory: string;
+}
+
+/** Join a room_resource to its CRM content, computing the effective category. */
+function withContent(
+  r: RoomResource,
+  byId: Map<string, Content>,
+): ResourceWithContent | null {
+  const content = byId.get(r.content_id);
+  if (!content) return null;
+  return { ...r, content, effectiveCategory: r.category ?? content.category };
 }
 
 export interface RoomData {
@@ -77,8 +89,8 @@ export async function loadRoomData(
 
   const byId = new Map(content.map((c) => [c.id, c] as const));
   const resources = listRoomResources(room.id)
-    .map((r) => ({ ...r, content: byId.get(r.content_id) }))
-    .filter((r): r is ResourceWithContent => Boolean(r.content));
+    .map((r) => withContent(r, byId))
+    .filter((r): r is ResourceWithContent => r !== null);
 
   return { room, account, enrichment, contacts, opportunities, resources };
 }
@@ -123,8 +135,8 @@ export async function loadBuyerRoom(
   const content = await listContent(token);
   const byId = new Map(content.map((c) => [c.id, c] as const));
   const resources = listVisibleRoomResources(room.id)
-    .map((r) => ({ ...r, content: byId.get(r.content_id) }))
-    .filter((r): r is ResourceWithContent => Boolean(r.content));
+    .map((r) => withContent(r, byId))
+    .filter((r): r is ResourceWithContent => r !== null);
 
   return { status: "ok", account, resources, room };
 }

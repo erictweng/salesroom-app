@@ -92,6 +92,7 @@ export interface Room {
   account_id: string;
   title: string;
   status: RoomStatus;
+  section_order: string | null; // JSON array of section keys; null -> default order
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -103,6 +104,7 @@ export interface RoomResource {
   content_id: string;
   position: number;
   hidden: number; // 0/1 (sqlite boolean)
+  category: string | null; // per-room override; null -> use the content's CRM category
   created_at: string;
 }
 

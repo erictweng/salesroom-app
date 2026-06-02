@@ -14,10 +14,17 @@ auto-refreshing feed with deterministic insight cards.
 
 Sign in as a rep at `/login`, then:
 
-- **Account picker** (`/seller`) lists every CRM account. One click opens the
-  account's room, creating it (idempotently) and seeding it with the full
-  content library if it doesn't exist yet.
-- **Room builder** (`/seller/rooms/[slug]`) renders four modules on one page:
+- **Account picker** (`/seller`) lists every CRM account, with **name search** so
+  it scales. One click opens the account's room, creating it (idempotently) and
+  seeding it with the full content library if it doesn't exist yet.
+- **Room builder** (`/seller/rooms/[slug]`) is build-first: a compact
+  **engagement KPI strip** stays glanceable up top, and the four panels (Content
+  Hub, Account Snapshot, Stakeholder Map, Activity & Engagement) are
+  **collapsible** (state per browser) and **drag-to-reorder** — the panel order is
+  saved **per room** (`rooms.section_order`, default order as fallback), with a
+  "Reset layout" control. Each stakeholder is **clickable → a profile modal** with
+  full CRM detail (email, phone, LinkedIn, role, seniority, engagement score, last
+  activity). The underlying modules:
   - **A — Account Snapshot**: account + enrichment context, degrades gracefully
     when fields or enrichment are missing.
   - **B — Stakeholder Map**: contacts with the Champion highlighted, the primary
@@ -36,10 +43,16 @@ Each room has **publish controls**: a draft/published status, a Publish/Unpublis
 toggle, Copy Link (the buyer URL), and Preview Buyer Room (opens the public route
 in a new tab). Only published rooms are visible to buyers.
 
-The Content Hub is **editable** (P4): a flat, position-ordered list with ▲/▼
-reorder and Hide/Unhide controls (each a server action). Order and visibility
-persist in SQLite; the buyer's grouped view renders only visible items in the
-saved order, picking up changes on the next load.
+The Content Hub is an editable **Kanban board** (P4): each content category is a
+column (fixed canonical order, shown even when empty), and resources are cards.
+The rep **drags a card within a column to reorder** it and **drags it to another
+column to recategorize** — one gesture does both (`@dnd-kit` multi-container, with
+a drag overlay and shuffle animation). Hide/Unhide toggles per card. Category is a
+per-room override (`room_resources.category`, falling back to the CRM category),
+so re-categorizing never touches the shared catalog. All edits are optimistic and
+persist via server actions (one flattened order write + a category write when a
+card changes column); the buyer's view groups by the same effective category and
+order on next load.
 
 ## Buyer loop (P2)
 
@@ -49,10 +62,12 @@ by the CRM's own 403 scoping, not a parallel ACL), **not published yet** (draft)
 or the **room** itself. Hidden resources are filtered server-side, so they never
 reach the browser.
 
-The room is a branded welcome hero, a "Have a question?" rep contact card, and
-the tracked Content Hub. Every consumption action emits an **identity-attributed
-event** that appears in the rep's feed (e.g., "Sarah watched Product Demo for 42
-seconds"):
+The room follows the provided design: a slim Secureframe top bar, a
+dark→bright-green hero with the welcome and a "Have a question?" rep card, a tab
+bar (Resources active; the other tabs are out of scope), and a **two-level
+Resources experience** — a category grid that drills into a per-category list.
+Every consumption action emits an **identity-attributed event** that appears in
+the rep's feed (e.g., "Sarah watched Product Demo for 42 seconds"):
 
 | Event | Fires when | Dedup |
 | ----- | ---------- | ----- |
@@ -244,7 +259,19 @@ npm run seed
 - **CRM availability.** If the CRM server is unreachable, CRM-backed routes
   return `503` with a retry hint rather than hanging.
 
+## Third-party libraries
+
+- **next / react** — App Router framework and UI.
+- **better-sqlite3** — synchronous embedded SQLite for rooms, resources, events.
+- **jose** — decode the CRM JWT to read the current user from the session cookie.
+- **tailwindcss** — styling.
+- **@dnd-kit/core · sortable · utilities** — drag-and-drop reordering of room
+  content (with the sliding shuffle animation).
+- **vitest · @testing-library/react · jsdom** — unit/component tests (dev only).
+
 ## AI tools used
 
-- **Claude (Cowork / Claude Code)** — scaffolding the project structure, CRM
-  client, SQLite schema, and API routes for the P0 backend spine.
+- **Claude (Cowork / Claude Code)** — used throughout: scaffolding the project,
+  the CRM client, SQLite schema and API routes, the seller and buyer portals, the
+  engagement-event tracking, feed insights, drag-and-drop content management, and
+  the test suites (Vitest unit tests + per-phase HTTP smoke scripts).

@@ -1,21 +1,23 @@
-import { ContentHub } from "@/components/modules/ContentHub";
+import { BuyerTopBar } from "./BuyerTopBar";
+import { HaveAQuestion } from "./HaveAQuestion";
+import { BuyerResources } from "./BuyerResources";
 import { RoomViewTracker } from "./RoomViewTracker";
 import type { Account, CrmUser, Room } from "@/lib/types";
 import type { ResourceWithContent } from "@/server/loaders";
 
 /**
  * Derive the rep's email from the account owner's name using the CRM's seed
- * convention (e.g., "Sarah Chen" -> sarah.chen@salesroom.io). Lets the "Have a
- * question?" card offer a real mailto without a separate rep-contact endpoint.
+ * convention (e.g., "Sarah Chen" -> sarah.chen@salesroom.io).
  */
 function repEmail(name: string): string {
   return `${name.trim().toLowerCase().replace(/\s+/g, ".")}@salesroom.io`;
 }
 
 /**
- * The buyer-facing room. Intentionally focused on the Resources experience (per
- * the brief): a branded welcome hero, a "Have a question?" rep card, and the
- * tracked Content Hub. Mounting RoomViewTracker records ROOM_VIEWED once.
+ * The buyer-facing room, styled after the design screenshots: a slim Secureframe
+ * top bar, a dark→bright green hero (welcome + "Have a question?" rep card), the
+ * Resources experience (category grid → drill-down), and a branded footer.
+ * Mounting RoomViewTracker records ROOM_VIEWED once.
  */
 export function BuyerRoom({
   user,
@@ -32,17 +34,21 @@ export function BuyerRoom({
   const owner = account.account_owner?.trim();
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50">
       <RoomViewTracker slug={room.slug} />
+      <BuyerTopBar />
 
-      <section className="brand-hero text-white">
-        <div className="mx-auto max-w-5xl px-6 py-12">
+      <section className="buyer-hero text-white">
+        <div className="mx-auto max-w-6xl px-6 py-12">
           <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
             <div className="max-w-xl">
-              <p className="text-sm font-medium uppercase tracking-widest text-brand-200">
-                {account.name}
-              </p>
-              <h1 className="mt-2 text-4xl font-semibold">
+              <div className="flex items-center gap-2 text-brand-100">
+                <span className="flex h-6 w-6 items-center justify-center rounded bg-white/15 text-xs font-bold">
+                  {account.name[0]}
+                </span>
+                <span className="text-sm font-medium">{account.name}</span>
+              </div>
+              <h1 className="mt-3 text-4xl font-semibold">
                 Welcome, {firstName}
               </h1>
               <p className="mt-4 text-brand-100">
@@ -50,39 +56,31 @@ export function BuyerRoom({
                 everything you need to evaluate Secureframe and move forward —
                 documents, demos, and a direct line to your team.
               </p>
+              <a
+                href="#resources"
+                className="mt-6 inline-block rounded-md border border-white/30 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+              >
+                View your proposal →
+              </a>
             </div>
 
-            {owner && (
-              <div className="w-full max-w-xs rounded-xl bg-white/10 p-5 backdrop-blur">
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-200">
-                  Have a question?
-                </p>
-                <p className="mt-2 font-medium">{owner}</p>
-                <p className="text-sm text-brand-100">Your account executive</p>
-                <a
-                  href={`mailto:${repEmail(owner)}`}
-                  className="mt-3 inline-block rounded-md bg-white px-3 py-1.5 text-sm font-medium text-brand-800 transition hover:bg-brand-50"
-                >
-                  Email {owner.split(/\s+/)[0]}
-                </a>
-              </div>
-            )}
+            {owner && <HaveAQuestion name={owner} email={repEmail(owner)} />}
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-5xl px-6 py-8">
-        <div className="mb-6 border-b border-slate-200">
-          <span className="inline-block border-b-2 border-brand-600 px-1 pb-2 text-sm font-medium text-brand-700">
-            Resources
-          </span>
-        </div>
-        <ContentHub resources={resources} tracking={{ slug: room.slug }} />
+      <section id="resources" className="mx-auto max-w-6xl px-6 py-8">
+        <BuyerResources slug={room.slug} resources={resources} />
       </section>
 
-      <footer className="py-10 text-center text-xs text-slate-400">
-        © 2026 Secureframe
+      <footer className="border-t border-slate-200 py-8 text-center">
+        <p className="text-sm font-semibold lowercase text-slate-700">
+          secureframe
+        </p>
+        <p className="mt-1 text-xs text-slate-400">
+          © 2026 Secureframe · Privacy policy
+        </p>
       </footer>
-    </main>
+    </div>
   );
 }

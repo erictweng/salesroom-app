@@ -135,6 +135,32 @@ export function setRoomStatus(roomId: number, status: RoomStatus): Room {
   return getRoomById(roomId)!;
 }
 
+/**
+ * Override a resource's category for this room. Pass null to clear the override
+ * and fall back to the content's CRM category.
+ */
+export function setResourceCategory(
+  roomId: number,
+  contentId: string,
+  category: string | null,
+): void {
+  getDb()
+    .prepare(
+      "UPDATE room_resources SET category = ? WHERE room_id = ? AND content_id = ?",
+    )
+    .run(category, roomId, contentId);
+}
+
+/**
+ * Save the per-room panel order (array of section keys). Pass null to clear it and
+ * fall back to the default order.
+ */
+export function setSectionOrder(roomId: number, keys: string[] | null): void {
+  getDb()
+    .prepare("UPDATE rooms SET section_order = ? WHERE id = ?")
+    .run(keys ? JSON.stringify(keys) : null, roomId);
+}
+
 /** Show or hide a single resource in a room (hidden ones are excluded for buyers). */
 export function setResourceHidden(
   roomId: number,
@@ -146,6 +172,25 @@ export function setResourceHidden(
       "UPDATE room_resources SET hidden = ? WHERE room_id = ? AND content_id = ?",
     )
     .run(hidden ? 1 : 0, roomId, contentId);
+}
+
+/**
+ * Set the explicit order of a room's resources (used by drag-and-drop). Writes
+ * position = index for each id in `orderedContentIds`, in one transaction, giving
+ * a clean dense ordering. Ids not present in the list keep their existing
+ * position (they'll sort after the reordered ones).
+ */
+export function setResourceOrder(
+  roomId: number,
+  orderedContentIds: string[],
+): void {
+  const db = getDb();
+  const update = db.prepare(
+    "UPDATE room_resources SET position = ? WHERE room_id = ? AND content_id = ?",
+  );
+  db.transaction(() => {
+    orderedContentIds.forEach((cid, i) => update.run(i, roomId, cid));
+  })();
 }
 
 /**

@@ -9,9 +9,13 @@ import {
   getRoomBySlug,
   setRoomStatus,
   setResourceHidden,
-  moveResource,
+  setResourceOrder,
+  setResourceCategory,
+  setSectionOrder,
 } from "@/lib/repo";
 import { clearSession } from "@/lib/session";
+import { isKnownCategory } from "@/lib/categories";
+import { SECTION_KEYS } from "@/lib/sections";
 import type { RoomStatus } from "@/lib/types";
 
 /**
@@ -54,33 +58,71 @@ export async function setRoomStatusAction(formData: FormData): Promise<void> {
   revalidatePath(`/seller/rooms/${room.slug}`);
 }
 
-/** Reorder a resource within a room (rep-only). direction is "up" | "down". */
-export async function reorderResourceAction(formData: FormData): Promise<void> {
+/**
+ * Persist a drag-and-drop reorder (rep-only). Called programmatically from the
+ * client ContentManager with the full ordered list of content ids. The client
+ * updates optimistically, so we don't revalidate here — the next render reads
+ * the persisted order from the DB.
+ */
+export async function setResourceOrderAction(
+  slug: string,
+  orderedContentIds: string[],
+): Promise<void> {
   requireRep();
-  const slug = String(formData.get("slug") ?? "");
-  const contentId = String(formData.get("content_id") ?? "");
-  const direction = String(formData.get("direction") ?? "");
-  if (direction !== "up" && direction !== "down") return;
+  if (!Array.isArray(orderedContentIds)) return;
+  const room = getRoomBySlug(slug);
+  if (!room) return;
+  setResourceOrder(room.id, orderedContentIds);
+}
 
+/**
+ * Override a resource's category for this room (rep-only). Validates against the
+ * known category set; called programmatically from the client ContentManager.
+ */
+export async function setResourceCategoryAction(
+  slug: string,
+  contentId: string,
+  category: string,
+): Promise<void> {
+  requireRep();
+  if (!isKnownCategory(category)) return;
   const room = getRoomBySlug(slug);
   if (!room || !contentId) return;
-  moveResource(room.id, contentId, direction);
-  revalidatePath(`/seller/rooms/${room.slug}`);
+  setResourceCategory(room.id, contentId, category);
 }
 
 /** Show/hide a resource (rep-only). Hidden resources are excluded for buyers. */
 export async function toggleResourceHiddenAction(
-  formData: FormData,
+  slug: string,
+  contentId: string,
+  hidden: boolean,
 ): Promise<void> {
   requireRep();
-  const slug = String(formData.get("slug") ?? "");
-  const contentId = String(formData.get("content_id") ?? "");
-  const hidden = String(formData.get("hidden") ?? "") === "1";
-
   const room = getRoomBySlug(slug);
   if (!room || !contentId) return;
   setResourceHidden(room.id, contentId, hidden);
-  revalidatePath(`/seller/rooms/${room.slug}`);
+}
+
+/** Persist the per-room panel order (rep-only). Ignores unknown keys. */
+export async function setSectionOrderAction(
+  slug: string,
+  keys: string[],
+): Promise<void> {
+  requireRep();
+  if (!Array.isArray(keys)) return;
+  const known = new Set<string>(SECTION_KEYS);
+  const clean = keys.filter((k) => known.has(k));
+  const room = getRoomBySlug(slug);
+  if (!room || clean.length === 0) return;
+  setSectionOrder(room.id, clean);
+}
+
+/** Reset the room's panel layout to the default order (rep-only). */
+export async function resetSectionLayoutAction(slug: string): Promise<void> {
+  requireRep();
+  const room = getRoomBySlug(slug);
+  if (!room) return;
+  setSectionOrder(room.id, null);
 }
 
 export async function logoutAction(): Promise<void> {

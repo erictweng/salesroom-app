@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   account_id   TEXT NOT NULL,
   title        TEXT NOT NULL,
   status       TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
+  section_order TEXT,
   created_by   TEXT NOT NULL,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -33,6 +34,7 @@ CREATE TABLE IF NOT EXISTS room_resources (
   content_id  TEXT NOT NULL,
   position    INTEGER NOT NULL DEFAULT 0,
   hidden      INTEGER NOT NULL DEFAULT 0 CHECK (hidden IN (0,1)),
+  category    TEXT,
   created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE (room_id, content_id)
 );
@@ -67,7 +69,30 @@ export function getDb(): Database.Database {
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
   db.exec(SCHEMA);
+  migrate(db);
 
   _db = db;
   return db;
+}
+
+/**
+ * Lightweight additive migrations for DBs created before a column existed.
+ * `CREATE TABLE IF NOT EXISTS` won't add new columns to an existing table, so we
+ * add them here, guarded by a check so it's safe to run on every startup.
+ */
+function migrate(db: Database.Database): void {
+  const hasColumn = (table: string, column: string): boolean =>
+    (db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]).some(
+      (c) => c.name === column,
+    );
+
+  // Per-room category override for a resource (null -> use the CRM's category).
+  if (!hasColumn("room_resources", "category")) {
+    db.exec("ALTER TABLE room_resources ADD COLUMN category TEXT");
+  }
+
+  // Per-room panel order for the seller room builder (JSON array; null -> default).
+  if (!hasColumn("rooms", "section_order")) {
+    db.exec("ALTER TABLE rooms ADD COLUMN section_order TEXT");
+  }
 }

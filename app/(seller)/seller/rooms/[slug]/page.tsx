@@ -5,19 +5,27 @@ import { getFeed, getEventsForInsights } from "@/lib/repo";
 import { computeInsights } from "@/lib/insights";
 import { RoomControls } from "@/components/seller/RoomControls";
 import { FeedAutoRefresh } from "@/components/seller/FeedAutoRefresh";
+import { EngagementSummary } from "@/components/seller/EngagementSummary";
+import { ContentManager } from "@/components/seller/ContentManager";
+import {
+  SortableSections,
+  type SectionDescriptor,
+} from "@/components/seller/SortableSections";
+import { orderKeys, parseSectionOrder } from "@/lib/sections";
 import { DealStrip } from "@/components/modules/DealStrip";
 import { AccountSnapshot } from "@/components/modules/AccountSnapshot";
 import { StakeholderMap } from "@/components/modules/StakeholderMap";
-import { ContentManager } from "@/components/seller/ContentManager";
 import { InsightsPanel } from "@/components/modules/InsightsPanel";
 import { ActivityFeed } from "@/components/modules/ActivityFeed";
 
 export const dynamic = "force-dynamic";
 
 /**
- * The room builder: one stacked page composing the four modules from a single
- * parallel data load. Unknown slugs 404 (via loadRoomData -> notFound). Modules
- * are pure components fed by props here, so the same set powers the P2 buyer view.
+ * The room builder, build-first: the rep's working surface (content curation) is
+ * primary, with a glanceable engagement strip up top. Account context,
+ * stakeholders, and the engagement detail live in collapsible sections so the
+ * page stays focused. Modules are pure components fed by a single parallel load,
+ * so the same set can power the buyer view.
  */
 export default async function RoomBuilderPage({
   params,
@@ -27,15 +35,13 @@ export default async function RoomBuilderPage({
   const { token } = requireRep();
   const data = await loadRoomData(params.slug, token);
   const events = getFeed(data.room.id);
-  // Map content id -> title so the feed can render "watched Product Demo …".
   const contentTitles = Object.fromEntries(
     data.resources.map((r) => [r.content_id, r.content.title]),
   );
-  // Insights run over a wider event window and exclude the rep's own previews.
   const contentMeta = Object.fromEntries(
     data.resources.map((r) => [
       r.content_id,
-      { title: r.content.title, category: r.content.category },
+      { title: r.content.title, category: r.effectiveCategory },
     ]),
   );
   const insights = computeInsights(
@@ -44,9 +50,47 @@ export default async function RoomBuilderPage({
     { excludeRoles: ["rep"] },
   );
 
+  // The reorderable panels. Built here (server) and ordered by the room's saved
+  // layout, so the chosen order server-renders on first paint.
+  const sectionMap: Record<string, SectionDescriptor> = {
+    content: {
+      id: "content",
+      title: "Content Hub",
+      storageKey: "content",
+      content: <ContentManager slug={data.room.slug} resources={data.resources} />,
+    },
+    snapshot: {
+      id: "snapshot",
+      title: "Account Snapshot",
+      storageKey: "snapshot",
+      content: <AccountSnapshot account={data.account} enrichment={data.enrichment} />,
+    },
+    stakeholders: {
+      id: "stakeholders",
+      title: "Stakeholder Map",
+      storageKey: "stakeholders",
+      content: <StakeholderMap contacts={data.contacts} />,
+    },
+    engagement: {
+      id: "engagement",
+      title: "Activity & Engagement",
+      storageKey: "engagement",
+      content: (
+        <>
+          <InsightsPanel insights={insights} />
+          <ActivityFeed events={events} contentTitles={contentTitles} />
+        </>
+      ),
+    },
+  };
+  const orderedSections = orderKeys(parseSectionOrder(data.room.section_order))
+    .map((k) => sectionMap[k])
+    .filter(Boolean) as SectionDescriptor[];
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <FeedAutoRefresh />
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <Link
@@ -67,11 +111,10 @@ export default async function RoomBuilderPage({
       </div>
 
       <DealStrip opportunities={data.opportunities} />
-      <AccountSnapshot account={data.account} enrichment={data.enrichment} />
-      <StakeholderMap contacts={data.contacts} />
-      <ContentManager slug={data.room.slug} resources={data.resources} />
-      <InsightsPanel insights={insights} />
-      <ActivityFeed events={events} contentTitles={contentTitles} />
+
+      <EngagementSummary insights={insights} status={data.room.status} />
+
+      <SortableSections slug={data.room.slug} sections={orderedSections} />
     </div>
   );
 }
