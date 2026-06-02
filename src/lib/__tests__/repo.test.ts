@@ -17,6 +17,7 @@ const {
   setResourceOrder,
   setResourceCategory,
   setSectionOrder,
+  setInternalNotes,
 } = await import("../repo");
 
 const { room } = createOrGetRoom({
@@ -93,5 +94,12 @@ describe("room resource reorder + hide", () => {
     ).toEqual(["engagement", "content"]);
     setSectionOrder(room.id, null);
     expect(getRoomBySlug(room.slug)!.section_order).toBeNull();
+  });
+
+  it("saves rep-only internal notes", () => {
+    setInternalNotes(room.id, "competitor X is in play; push security");
+    expect(getRoomBySlug(room.slug)!.internal_notes).toBe(
+      "competitor X is in play; push security",
+    );
   });
 });

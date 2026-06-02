@@ -49,6 +49,7 @@ const D=require("better-sqlite3"); const db=new D("./data/salesroom.db");
 db.prepare("UPDATE rooms SET status=? WHERE slug=?").run("published", process.argv[1]);
 const r=db.prepare("SELECT id FROM rooms WHERE slug=?").get(process.argv[1]);
 db.prepare("UPDATE room_resources SET hidden=1 WHERE room_id=? AND content_id=?").run(r.id, process.argv[2]);
+db.prepare("UPDATE rooms SET internal_notes=? WHERE slug=?").run("SELLER_ONLY_NOTE", process.argv[1]);
 ' "$VEL" "$DOCID"
 
 echo "== unauthenticated -> login prompt =="
@@ -59,6 +60,7 @@ B=$(curl -s -b "$PSHARMA" "$APP/room/$VEL")
 contains "buyer sees welcome hero" "Welcome," "$B"
 contains "buyer sees a video resource" "$VIDTITLE" "$B"
 notcontains "hidden resource is excluded" "$DOCTITLE" "$B"
+notcontains "internal notes never reach the buyer" "SELLER_ONLY_NOTE" "$B"
 
 echo "== cross-account buyer -> not authorized =="
 contains "d.park blocked from Velora" "don't have access" "$(curl -s -b "$DPARK" "$APP/room/$VEL")"

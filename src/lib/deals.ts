@@ -12,6 +12,19 @@ const STAGE_RANK: Record<string, number> = {
   Discovery: 1,
 };
 
+/** Ordered CRM opportunity stages (early -> late), for the Deal Overview stepper. */
+export const STAGE_SEQUENCE = [
+  "Discovery",
+  "Technical Evaluation",
+  "Proposal",
+  "Negotiation",
+] as const;
+
+/** Index of a stage in the sequence, or -1 if unknown. */
+export function stageIndex(stage: string): number {
+  return (STAGE_SEQUENCE as readonly string[]).indexOf(stage);
+}
+
 /**
  * Pick the "primary" opportunity to summarise: most-advanced stage, tie-broken
  * by soonest close date, then most recently created. Deterministic.

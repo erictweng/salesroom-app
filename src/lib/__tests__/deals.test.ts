@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { pickPrimaryOpportunity } from "../deals";
+import { pickPrimaryOpportunity, stageIndex } from "../deals";
 import type { Opportunity } from "../types";
 
 function opp(overrides: Partial<Opportunity>): Opportunity {
@@ -43,5 +43,15 @@ describe("pickPrimaryOpportunity", () => {
       opp({ id: "sooner", stage: "Proposal", close_date: "2026-05-01" }),
     ]);
     expect(picked?.id).toBe("sooner");
+  });
+});
+
+describe("stageIndex", () => {
+  it("returns the position in the stage sequence", () => {
+    expect(stageIndex("Discovery")).toBe(0);
+    expect(stageIndex("Negotiation")).toBe(3);
+  });
+  it("returns -1 for an unknown stage", () => {
+    expect(stageIndex("Closed Won")).toBe(-1);
   });
 });

@@ -93,6 +93,7 @@ export interface Room {
   title: string;
   status: RoomStatus;
   section_order: string | null; // JSON array of section keys; null -> default order
+  internal_notes: string | null; // rep-only notes; never exposed to buyers
   created_by: string;
   created_at: string;
   updated_at: string;

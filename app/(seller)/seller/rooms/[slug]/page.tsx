@@ -12,11 +12,13 @@ import {
   type SectionDescriptor,
 } from "@/components/seller/SortableSections";
 import { orderKeys, parseSectionOrder } from "@/lib/sections";
-import { DealStrip } from "@/components/modules/DealStrip";
+import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { DealOverview } from "@/components/modules/DealOverview";
 import { AccountSnapshot } from "@/components/modules/AccountSnapshot";
 import { StakeholderMap } from "@/components/modules/StakeholderMap";
 import { InsightsPanel } from "@/components/modules/InsightsPanel";
 import { ActivityFeed } from "@/components/modules/ActivityFeed";
+import { InternalNotes } from "@/components/seller/InternalNotes";
 
 export const dynamic = "force-dynamic";
 
@@ -73,13 +75,33 @@ export default async function RoomBuilderPage({
     },
     engagement: {
       id: "engagement",
-      title: "Activity & Engagement",
+      title: "Deal & Engagement",
       storageKey: "engagement",
       content: (
-        <>
-          <InsightsPanel insights={insights} />
-          <ActivityFeed events={events} contentTitles={contentTitles} />
-        </>
+        <div className="space-y-4">
+          {/* Deal status (CRM) stays visible at the top... */}
+          <DealOverview opportunities={data.opportunities} />
+          {/* ...with the live activity in its own nested collapse below. */}
+          <CollapsibleSection
+            title="Activity & Engagement"
+            storageKey="activity"
+            nested
+          >
+            <InsightsPanel insights={insights} />
+            <ActivityFeed events={events} contentTitles={contentTitles} />
+          </CollapsibleSection>
+        </div>
+      ),
+    },
+    notes: {
+      id: "notes",
+      title: "Internal Notes",
+      storageKey: "notes",
+      content: (
+        <InternalNotes
+          slug={data.room.slug}
+          initial={data.room.internal_notes ?? ""}
+        />
       ),
     },
   };
@@ -109,8 +131,6 @@ export default async function RoomBuilderPage({
         </div>
         <RoomControls slug={data.room.slug} status={data.room.status} />
       </div>
-
-      <DealStrip opportunities={data.opportunities} />
 
       <EngagementSummary insights={insights} status={data.room.status} />
 

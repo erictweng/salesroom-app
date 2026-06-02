@@ -12,6 +12,7 @@ import {
   setResourceOrder,
   setResourceCategory,
   setSectionOrder,
+  setInternalNotes,
 } from "@/lib/repo";
 import { clearSession } from "@/lib/session";
 import { isKnownCategory } from "@/lib/categories";
@@ -123,6 +124,17 @@ export async function resetSectionLayoutAction(slug: string): Promise<void> {
   const room = getRoomBySlug(slug);
   if (!room) return;
   setSectionOrder(room.id, null);
+}
+
+/** Save rep-only internal notes for a room (rep-only). Optimistic; no revalidate. */
+export async function saveNotesAction(
+  slug: string,
+  notes: string,
+): Promise<void> {
+  requireRep();
+  const room = getRoomBySlug(slug);
+  if (!room) return;
+  setInternalNotes(room.id, typeof notes === "string" ? notes : "");
 }
 
 export async function logoutAction(): Promise<void> {

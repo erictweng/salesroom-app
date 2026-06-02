@@ -8,7 +8,8 @@ export const SECTION_KEYS = [
   "content",
   "snapshot",
   "stakeholders",
-  "engagement",
+  "engagement", // "Deal & Engagement" panel (deal status + activity)
+  "notes", // rep-only internal notes
 ] as const;
 
 export type SectionKey = (typeof SECTION_KEYS)[number];
@@ -23,6 +24,7 @@ export const DEFAULT_SECTION_ORDER: SectionKey[] = [
   "stakeholders",
   "content",
   "engagement",
+  "notes",
 ];
 
 const KNOWN = new Set<string>(SECTION_KEYS);

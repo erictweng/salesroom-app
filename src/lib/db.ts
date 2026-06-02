@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   title        TEXT NOT NULL,
   status       TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
   section_order TEXT,
+  internal_notes TEXT,
   created_by   TEXT NOT NULL,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -94,5 +95,10 @@ function migrate(db: Database.Database): void {
   // Per-room panel order for the seller room builder (JSON array; null -> default).
   if (!hasColumn("rooms", "section_order")) {
     db.exec("ALTER TABLE rooms ADD COLUMN section_order TEXT");
+  }
+
+  // Rep-only internal notes (never shown to buyers).
+  if (!hasColumn("rooms", "internal_notes")) {
+    db.exec("ALTER TABLE rooms ADD COLUMN internal_notes TEXT");
   }
 }

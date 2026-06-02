@@ -161,6 +161,13 @@ export function setSectionOrder(roomId: number, keys: string[] | null): void {
     .run(keys ? JSON.stringify(keys) : null, roomId);
 }
 
+/** Save the room's rep-only internal notes (never shown to buyers). */
+export function setInternalNotes(roomId: number, notes: string): void {
+  getDb()
+    .prepare("UPDATE rooms SET internal_notes = ? WHERE id = ?")
+    .run(notes, roomId);
+}
+
 /** Show or hide a single resource in a room (hidden ones are excluded for buyers). */
 export function setResourceHidden(
   roomId: number,
