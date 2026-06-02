@@ -6,11 +6,16 @@ import type { ResourceWithContent } from "@/server/loaders";
 
 /** Module C — Content Hub. Curated resources grouped by category, with an
  * embedded video player for video items. Hidden resources are excluded from the
- * buyer-facing view; the seller toggles hidden state in P4. */
+ * buyer-facing view; the seller toggles hidden state in P4.
+ *
+ * Pass `tracking` (buyer room) to make the cards emit engagement events; omit it
+ * for the seller's silent preview. */
 export function ContentHub({
   resources,
+  tracking,
 }: {
   resources: ResourceWithContent[];
+  tracking?: { slug: string };
 }) {
   const visible = resources.filter((r) => !r.hidden);
 
@@ -44,7 +49,11 @@ export function ContentHub({
               </h3>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {items.map((r) => (
-                  <ResourceCard key={r.id} content={r.content} />
+                  <ResourceCard
+                    key={r.id}
+                    content={r.content}
+                    tracking={tracking}
+                  />
                 ))}
               </div>
             </div>

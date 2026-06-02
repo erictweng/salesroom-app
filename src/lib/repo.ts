@@ -4,7 +4,7 @@
  */
 
 import { getDb } from "./db";
-import type { EventRecord, Room, RoomResource } from "./types";
+import type { EventRecord, Room, RoomResource, RoomStatus } from "./types";
 
 /* ------------------------------- slugs -------------------------------- */
 
@@ -112,6 +112,27 @@ export function listRoomResources(roomId: number): RoomResource[] {
       "SELECT * FROM room_resources WHERE room_id = ? ORDER BY position ASC, id ASC",
     )
     .all(roomId) as RoomResource[];
+}
+
+/**
+ * Resources a buyer is allowed to see: hidden ones are excluded at the query
+ * level so they never reach the browser DOM (not just visually hidden).
+ */
+export function listVisibleRoomResources(roomId: number): RoomResource[] {
+  return getDb()
+    .prepare(
+      "SELECT * FROM room_resources WHERE room_id = ? AND hidden = 0 ORDER BY position ASC, id ASC",
+    )
+    .all(roomId) as RoomResource[];
+}
+
+/** Flip a room between draft and published. Returns the updated row. */
+export function setRoomStatus(roomId: number, status: RoomStatus): Room {
+  const db = getDb();
+  db.prepare(
+    "UPDATE rooms SET status = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
+  ).run(status, roomId);
+  return getRoomById(roomId)!;
 }
 
 /* ------------------------------- events ------------------------------- */

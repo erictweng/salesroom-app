@@ -1,5 +1,6 @@
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { VideoPlayer } from "./VideoPlayer";
+import { TrackedDocLink } from "./TrackedDocLink";
 import { parseYouTubeId } from "@/lib/youtube";
 import { contentTypeLabel, formatDuration } from "@/lib/format";
 import type { Content } from "@/lib/types";
@@ -17,10 +18,31 @@ const TYPE_TONE: Record<string, BadgeTone> = {
  * player; everything else (docs, case studies, one-pagers) links out to the PDF
  * served by the CRM. A non-video or unparseable URL degrades to a thumbnail
  * link rather than a broken player.
+ *
+ * Pass `tracking` (buyer room) to emit engagement events on play/open; omit it
+ * (seller preview) for a silent, non-tracking card.
  */
-export function ResourceCard({ content }: { content: Content }) {
-  const videoId =
-    content.type === "video" ? parseYouTubeId(content.url) : null;
+export function ResourceCard({
+  content,
+  tracking,
+}: {
+  content: Content;
+  tracking?: { slug: string };
+}) {
+  const videoId = content.type === "video" ? parseYouTubeId(content.url) : null;
+
+  const thumb = content.thumbnail_url ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={content.thumbnail_url}
+      alt=""
+      className="h-full w-full object-cover"
+    />
+  ) : (
+    <div className="flex h-full w-full items-center justify-center text-sm text-slate-300">
+      No preview
+    </div>
+  );
 
   return (
     <div className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white">
@@ -29,7 +51,25 @@ export function ResourceCard({ content }: { content: Content }) {
           videoId={videoId}
           title={content.title}
           thumbnail={content.thumbnail_url}
+          tracking={
+            tracking
+              ? {
+                  slug: tracking.slug,
+                  contentId: content.id,
+                  durationSeconds: content.duration_seconds,
+                }
+              : undefined
+          }
         />
+      ) : tracking ? (
+        <TrackedDocLink
+          slug={tracking.slug}
+          contentId={content.id}
+          href={content.url}
+          className="block aspect-video w-full overflow-hidden bg-slate-100"
+        >
+          {thumb}
+        </TrackedDocLink>
       ) : (
         <a
           href={content.url}
@@ -37,18 +77,7 @@ export function ResourceCard({ content }: { content: Content }) {
           rel="noopener noreferrer"
           className="block aspect-video w-full overflow-hidden bg-slate-100"
         >
-          {content.thumbnail_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={content.thumbnail_url}
-              alt=""
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-sm text-slate-300">
-              No preview
-            </div>
-          )}
+          {thumb}
         </a>
       )}
 

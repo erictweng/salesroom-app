@@ -4,10 +4,11 @@ A per-account "sales room" where a rep curates content for a buyer and sees
 identity-attributed engagement. Built on Next.js (App Router) + SQLite, backed by
 a local mock CRM server that stands in for Salesforce.
 
-This repository currently contains **P0 (backend spine)** and **P1 (seller
-portal)**: the CRM client, the SQLite store, session/auth, the events/rooms API,
-and the rep-facing UI for picking an account and curating a room. The buyer loop,
-live feed, and polish (P2–P4) build on top of it.
+This repository contains **P0 (backend spine)**, **P1 (seller portal)**, and
+**P2 (buyer loop)**: the CRM client, the SQLite store, session/auth, the
+events/rooms API, the rep-facing UI for curating a room, and the buyer-facing
+room that consumes content and emits identity-attributed engagement back to the
+rep. Insights and final polish (P3–P4) build on top of it.
 
 ## Seller portal (P1)
 
@@ -30,6 +31,36 @@ Sign in as a rep at `/login`, then:
 
 All CRM reads happen in server components / server actions; the token never
 reaches the browser. Non-reps are sent to a friendly `/forbidden` page.
+
+Each room has **publish controls**: a draft/published status, a Publish/Unpublish
+toggle, Copy Link (the buyer URL), and Preview Buyer Room (opens the public route
+in a new tab). Only published rooms are visible to buyers.
+
+## Buyer loop (P2)
+
+Buyers open `/room/[slug]` and the page resolves to one of four states: an inline
+**login prompt** (unauthenticated), **not authorized** (wrong account — enforced
+by the CRM's own 403 scoping, not a parallel ACL), **not published yet** (draft),
+or the **room** itself. Hidden resources are filtered server-side, so they never
+reach the browser.
+
+The room is a branded welcome hero, a "Have a question?" rep contact card, and
+the tracked Content Hub. Every consumption action emits an **identity-attributed
+event** that appears in the rep's feed (e.g., "Sarah watched Product Demo for 42
+seconds"):
+
+| Event | Fires when | Dedup |
+| ----- | ---------- | ----- |
+| `ROOM_VIEWED` | room opens | once per session |
+| `RESOURCE_OPENED` / `RESOURCE_REVISITED` | a PDF is opened (first vs. repeat) | per resource, per session |
+| `VIDEO_PLAYED` | first play (YouTube IFrame API) | once per video |
+| `VIDEO_PROGRESS` | crossing 25% / 50% / 75% | once each; seeking back never re-fires |
+| `VIDEO_COMPLETED` | the player's ENDED state only | once per video |
+
+Resilience built in: if the YouTube IFrame API can't load (adblocker/offline) the
+card falls back to a plain embed; events post with `keepalive` so a mid-watch
+event survives a tab close; and dedup uses `sessionStorage`, so refreshes and
+React re-renders don't flood the feed.
 
 ## Architecture at a glance
 
@@ -127,12 +158,12 @@ All passwords are `demo1234`.
   npm test
   ```
 
-- **P1 HTTP smoke test** exercises the seller flow end to end (rep login →
-  account picker → one-click create seeds 16 resources → modules render → buyers
-  blocked). Start the CRM binary and `npm run dev`, then:
+- **HTTP smoke tests** exercise each phase end to end. Start the CRM binary and
+  `npm run dev`, then:
 
   ```bash
-  bash scripts/test-p1.sh
+  bash scripts/test-p1.sh   # seller: login → picker → create/seed → modules → role guard
+  bash scripts/test-p2.sh   # buyer: login prompt, not-authorized/not-published, 6 events, rich feed
   ```
 
 ## Design decisions & known limitations

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireRep } from "@/server/guards";
 import { loadRoomData } from "@/server/loaders";
 import { getFeed } from "@/lib/repo";
-import { Badge } from "@/components/ui/Badge";
+import { RoomControls } from "@/components/seller/RoomControls";
 import { DealStrip } from "@/components/modules/DealStrip";
 import { AccountSnapshot } from "@/components/modules/AccountSnapshot";
 import { StakeholderMap } from "@/components/modules/StakeholderMap";
@@ -24,10 +24,14 @@ export default async function RoomBuilderPage({
   const { token } = requireRep();
   const data = await loadRoomData(params.slug, token);
   const events = getFeed(data.room.id);
+  // Map content id -> title so the feed can render "watched Product Demo …".
+  const contentTitles = Object.fromEntries(
+    data.resources.map((r) => [r.content_id, r.content.title]),
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <Link
             href="/seller"
@@ -43,16 +47,14 @@ export default async function RoomBuilderPage({
             created by {data.room.created_by}
           </p>
         </div>
-        <Badge tone={data.room.status === "published" ? "green" : "amber"}>
-          {data.room.status === "published" ? "Published" : "Draft"}
-        </Badge>
+        <RoomControls slug={data.room.slug} status={data.room.status} />
       </div>
 
       <DealStrip opportunities={data.opportunities} />
       <AccountSnapshot account={data.account} enrichment={data.enrichment} />
       <StakeholderMap contacts={data.contacts} />
       <ContentHub resources={data.resources} />
-      <ActivityFeed events={events} />
+      <ActivityFeed events={events} contentTitles={contentTitles} />
     </div>
   );
 }

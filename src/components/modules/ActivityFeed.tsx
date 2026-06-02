@@ -4,21 +4,62 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { formatDate } from "@/lib/format";
 import type { EventRecord } from "@/lib/types";
 
-const TYPE_LABEL: Record<string, string> = {
-  ROOM_VIEWED: "viewed the room",
-  RESOURCE_OPENED: "opened a resource",
-  RESOURCE_REVISITED: "revisited a resource",
-  VIDEO_PLAYED: "played a video",
-  VIDEO_PROGRESS: "watched part of a video",
-  VIDEO_COMPLETED: "finished a video",
-};
+/**
+ * Turn a stored event into a human, attributed line — the whole point of the
+ * product is that the rep sees "Sarah watched Product Demo for 42 seconds", not
+ * a raw event code. Title comes from the resolved content map; watch-time/percent
+ * come from the event metadata (stored as JSON).
+ */
+function describe(
+  e: EventRecord,
+  titles: Record<string, string>,
+): string {
+  const who = e.actor_name ?? e.actor_email ?? "Someone";
+  const title = e.content_id
+    ? (titles[e.content_id] ?? "a resource")
+    : "a resource";
+
+  let meta: { seconds?: unknown; percent?: unknown } = {};
+  try {
+    meta = e.metadata ? JSON.parse(e.metadata) : {};
+  } catch {
+    /* malformed metadata -> ignore */
+  }
+  const secs = typeof meta.seconds === "number" ? meta.seconds : null;
+  const pct = typeof meta.percent === "number" ? meta.percent : null;
+
+  switch (e.type) {
+    case "ROOM_VIEWED":
+      return `${who} viewed the room`;
+    case "RESOURCE_OPENED":
+      return `${who} opened ${title}`;
+    case "RESOURCE_REVISITED":
+      return `${who} revisited ${title}`;
+    case "VIDEO_PLAYED":
+      return `${who} started watching ${title}`;
+    case "VIDEO_PROGRESS":
+      if (secs != null) return `${who} watched ${title} for ${secs} seconds`;
+      if (pct != null) return `${who} watched ${pct}% of ${title}`;
+      return `${who} watched ${title}`;
+    case "VIDEO_COMPLETED":
+      return `${who} finished ${title}`;
+    default:
+      return `${who} — ${e.type}`;
+  }
+}
 
 /**
- * Module E — Activity & Engagement Feed. In P1 this is typically empty (buyer
- * events arrive in P2); the full attributed feed + insights land in P3. It still
- * renders any events present so the layout is complete from day one.
+ * Module E — Activity & Engagement Feed. Renders attributed, human-readable
+ * lines newest-first. Populated by buyer actions from P2; P3 layers on insights
+ * (top stakeholder, most-viewed resource, suggested follow-up).
  */
-export function ActivityFeed({ events }: { events: EventRecord[] }) {
+export function ActivityFeed({
+  events,
+  contentTitles = {},
+}: {
+  events: EventRecord[];
+  contentTitles?: Record<string, string>;
+}) {
   return (
     <Card className="p-6">
       <SectionHeader
@@ -36,15 +77,11 @@ export function ActivityFeed({ events }: { events: EventRecord[] }) {
           {events.map((e) => (
             <li
               key={e.id}
-              className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 text-sm"
+              className="flex items-center gap-3 rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2 text-sm"
             >
-              <span className="font-medium text-slate-800">
-                {e.actor_name ?? e.actor_email ?? "Someone"}
-              </span>
-              <span className="text-slate-500">
-                {TYPE_LABEL[e.type] ?? e.type}
-              </span>
-              <span className="ml-auto text-xs text-slate-400">
+              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
+              <span className="text-slate-700">{describe(e, contentTitles)}</span>
+              <span className="ml-auto shrink-0 text-xs text-slate-400">
                 {formatDate(e.created_at)}
               </span>
             </li>
