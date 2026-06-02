@@ -9,6 +9,13 @@ describe("orderKeys", () => {
   it("returns the default order when nothing is saved", () => {
     expect(orderKeys(null)).toEqual(DEFAULT_SECTION_ORDER);
     expect(orderKeys(undefined)).toEqual(DEFAULT_SECTION_ORDER);
+    // Default: account context + stakeholders first, content, engagement last.
+    expect(orderKeys(null)).toEqual([
+      "snapshot",
+      "stakeholders",
+      "content",
+      "engagement",
+    ]);
   });
 
   it("respects the saved order and appends any missing panels", () => {

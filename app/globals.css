@@ -31,7 +31,8 @@ body {
     linear-gradient(100deg, #03241b 0%, #064e3b 45%, #0a7f57 100%);
 }
 
-/* Slim dark bar above the buyer hero. */
+/* Slim bar above the buyer hero — same dark→bright green ramp as the hero so the
+   top of the page reads as one continuous gradient. */
 .buyer-topbar {
-  background-color: #03241b;
+  background-image: linear-gradient(100deg, #03241b 0%, #064e3b 55%, #0a7f57 100%);
 }

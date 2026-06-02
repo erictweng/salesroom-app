@@ -13,7 +13,17 @@ export const SECTION_KEYS = [
 
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
-export const DEFAULT_SECTION_ORDER: SectionKey[] = [...SECTION_KEYS];
+/**
+ * Default panel layout: account context and stakeholders first, then the content
+ * the rep curates, with the engagement detail last. Reps can drag to a different
+ * order per room; this is just the starting point.
+ */
+export const DEFAULT_SECTION_ORDER: SectionKey[] = [
+  "snapshot",
+  "stakeholders",
+  "content",
+  "engagement",
+];
 
 const KNOWN = new Set<string>(SECTION_KEYS);
 
