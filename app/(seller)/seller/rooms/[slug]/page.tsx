@@ -8,7 +8,7 @@ import { FeedAutoRefresh } from "@/components/seller/FeedAutoRefresh";
 import { DealStrip } from "@/components/modules/DealStrip";
 import { AccountSnapshot } from "@/components/modules/AccountSnapshot";
 import { StakeholderMap } from "@/components/modules/StakeholderMap";
-import { ContentHub } from "@/components/modules/ContentHub";
+import { ContentManager } from "@/components/seller/ContentManager";
 import { InsightsPanel } from "@/components/modules/InsightsPanel";
 import { ActivityFeed } from "@/components/modules/ActivityFeed";
 
@@ -69,7 +69,7 @@ export default async function RoomBuilderPage({
       <DealStrip opportunities={data.opportunities} />
       <AccountSnapshot account={data.account} enrichment={data.enrichment} />
       <StakeholderMap contacts={data.contacts} />
-      <ContentHub resources={data.resources} />
+      <ContentManager slug={data.room.slug} resources={data.resources} />
       <InsightsPanel insights={insights} />
       <ActivityFeed events={events} contentTitles={contentTitles} />
     </div>

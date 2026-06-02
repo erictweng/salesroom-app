@@ -4,12 +4,11 @@ A per-account "sales room" where a rep curates content for a buyer and sees
 identity-attributed engagement. Built on Next.js (App Router) + SQLite, backed by
 a local mock CRM server that stands in for Salesforce.
 
-This repository contains **P0 (backend spine)**, **P1 (seller portal)**,
-**P2 (buyer loop)**, and **P3 (feed + insights)**: the CRM client, the SQLite
-store, session/auth, the events/rooms API, the rep-facing curation UI, the
+This is a complete mini Digital Sales Room across all five phases (P0–P4): the
+CRM client, the SQLite store, session/auth, the events/rooms API, the rep-facing
+curation UI (account picker, room builder, reorderable/​hideable content), the
 buyer-facing room that emits identity-attributed engagement, and the rep's
-auto-refreshing feed with deterministic insight cards. Final polish (P4) builds
-on top of it.
+auto-refreshing feed with deterministic insight cards.
 
 ## Seller portal (P1)
 
@@ -36,6 +35,11 @@ reaches the browser. Non-reps are sent to a friendly `/forbidden` page.
 Each room has **publish controls**: a draft/published status, a Publish/Unpublish
 toggle, Copy Link (the buyer URL), and Preview Buyer Room (opens the public route
 in a new tab). Only published rooms are visible to buyers.
+
+The Content Hub is **editable** (P4): a flat, position-ordered list with ▲/▼
+reorder and Hide/Unhide controls (each a server action). Order and visibility
+persist in SQLite; the buyer's grouped view renders only visible items in the
+saved order, picking up changes on the next load.
 
 ## Buyer loop (P2)
 
@@ -187,7 +191,39 @@ fresh room renders empty states rather than dividing by zero.
   bash scripts/test-p1.sh   # seller: login → picker → create/seed → modules → role guard
   bash scripts/test-p2.sh   # buyer: login prompt, not-authorized/not-published, 6 events, rich feed
   bash scripts/test-p3.sh   # insights: top stakeholder, most-viewed, follow-up, multi-buyer, rep-exclusion
+  bash scripts/test-p4.sh   # polish: reorder + hide reflected, buyer exclusion, demo seed
   ```
+
+  Each script assumes a reasonably clean database — run one after a fresh
+  `npm run dev` (delete `data/` or `npm run db:reset` to reset). They share one
+  SQLite file, so running them back-to-back against the same DB can interfere
+  (e.g. the seed step skips rooms that already have events).
+
+## Optional: seed demo activity
+
+To make a room's feed and insights look alive for a walkthrough, populate a few
+past-dated buyer events (idempotent — skips rooms that already have events):
+
+```bash
+npm run seed
+```
+
+## Pre-submission QA checklist
+
+- [x] Fresh clone + README steps run against the CRM binary
+- [x] All four modules (Account Snapshot, Stakeholder Map, Content Hub, Activity/Insights) visible and populated
+- [x] All 6 event types fire and are accepted, no duplicates (client dedup + server validation)
+- [x] Multi-threading: two Velora buyers both appear, attributed, in the feed/insights
+- [x] Read-only CRM confirmed (only non-GET CRM call is auth/login — static-checked in `test-p0.sh`)
+- [x] Empty states (fresh room, no enrichment, no events) don't crash
+- [x] 401 / 403 / 404 paths show friendly UI (login prompt, not-authorized, not-published, /forbidden)
+- [x] Reorder + hide persist and reflect in the buyer view
+- [ ] Loom / walkthrough recorded (do this last, on your machine)
+
+> The one path not covered by the sandbox test suite is **live in-browser video
+> playback** firing the progress events through the YouTube IFrame API (no
+> headless browser here). The threshold/dedup logic and the event plumbing are
+> unit- and HTTP-tested; confirm the live player with a 60-second manual pass.
 
 ## Design decisions & known limitations
 

@@ -135,6 +135,48 @@ export function setRoomStatus(roomId: number, status: RoomStatus): Room {
   return getRoomById(roomId)!;
 }
 
+/** Show or hide a single resource in a room (hidden ones are excluded for buyers). */
+export function setResourceHidden(
+  roomId: number,
+  contentId: string,
+  hidden: boolean,
+): void {
+  getDb()
+    .prepare(
+      "UPDATE room_resources SET hidden = ? WHERE room_id = ? AND content_id = ?",
+    )
+    .run(hidden ? 1 : 0, roomId, contentId);
+}
+
+/**
+ * Move a resource one slot up or down. Rather than swapping two `position`
+ * values (which can drift if they ever collide), we read the current order,
+ * move the item in-array, and rewrite positions as a dense 0..n-1 sequence in a
+ * transaction — always leaving a clean, gap-free ordering. No-op at the ends.
+ */
+export function moveResource(
+  roomId: number,
+  contentId: string,
+  direction: "up" | "down",
+): void {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      "SELECT id, content_id FROM room_resources WHERE room_id = ? ORDER BY position ASC, id ASC",
+    )
+    .all(roomId) as { id: number; content_id: string }[];
+
+  const idx = rows.findIndex((r) => r.content_id === contentId);
+  if (idx === -1) return;
+  const target = direction === "up" ? idx - 1 : idx + 1;
+  if (target < 0 || target >= rows.length) return;
+
+  [rows[idx], rows[target]] = [rows[target], rows[idx]];
+
+  const update = db.prepare("UPDATE room_resources SET position = ? WHERE id = ?");
+  db.transaction(() => rows.forEach((r, i) => update.run(i, r.id)))();
+}
+
 /* ------------------------------- events ------------------------------- */
 
 export interface InsertEventInput {
