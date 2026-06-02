@@ -4,9 +4,32 @@ A per-account "sales room" where a rep curates content for a buyer and sees
 identity-attributed engagement. Built on Next.js (App Router) + SQLite, backed by
 a local mock CRM server that stands in for Salesforce.
 
-This repository currently contains **P0 — the backend spine**: the CRM client,
-the SQLite store, session/auth, and the events/rooms API. The seller and buyer
-portals (P1–P4) build on top of it.
+This repository currently contains **P0 (backend spine)** and **P1 (seller
+portal)**: the CRM client, the SQLite store, session/auth, the events/rooms API,
+and the rep-facing UI for picking an account and curating a room. The buyer loop,
+live feed, and polish (P2–P4) build on top of it.
+
+## Seller portal (P1)
+
+Sign in as a rep at `/login`, then:
+
+- **Account picker** (`/seller`) lists every CRM account. One click opens the
+  account's room, creating it (idempotently) and seeding it with the full
+  content library if it doesn't exist yet.
+- **Room builder** (`/seller/rooms/[slug]`) renders four modules on one page:
+  - **A — Account Snapshot**: account + enrichment context, degrades gracefully
+    when fields or enrichment are missing.
+  - **B — Stakeholder Map**: contacts with the Champion highlighted, the primary
+    contact starred, each colored by the CRM `engagement_score` (labeled "CRM
+    score" so it's never confused with live in-room activity).
+  - **C — Content Hub**: curated resources grouped by category, with an embedded,
+    click-to-play YouTube player for videos.
+  - **E — Activity & Engagement**: the in-room feed (empty until buyers generate
+    events in P2; populated with insights in P3).
+  - Plus a one-line **deal context** strip (most-advanced open opportunity).
+
+All CRM reads happen in server components / server actions; the token never
+reaches the browser. Non-reps are sent to a friendly `/forbidden` page.
 
 ## Architecture at a glance
 
@@ -93,6 +116,24 @@ All passwords are `demo1234`.
 
 `ROOM_VIEWED`, `RESOURCE_OPENED`, `RESOURCE_REVISITED`, `VIDEO_PLAYED`,
 `VIDEO_PROGRESS`, `VIDEO_COMPLETED`. Any other value is rejected with `400`.
+
+## Testing
+
+- **Unit tests** (Vitest + React Testing Library) cover the edge cases the seed
+  data can't trigger — null enrichment, missing fields, empty stakeholder lists,
+  no Champion, null scores — plus the deal-picker and YouTube-URL logic:
+
+  ```bash
+  npm test
+  ```
+
+- **P1 HTTP smoke test** exercises the seller flow end to end (rep login →
+  account picker → one-click create seeds 16 resources → modules render → buyers
+  blocked). Start the CRM binary and `npm run dev`, then:
+
+  ```bash
+  bash scripts/test-p1.sh
+  ```
 
 ## Design decisions & known limitations
 
