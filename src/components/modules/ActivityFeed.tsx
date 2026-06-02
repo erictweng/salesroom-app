@@ -81,6 +81,11 @@ export function ActivityFeed({
             >
               <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-500" />
               <span className="text-slate-700">{describe(e, contentTitles)}</span>
+              {e.actor_role === "rep" && (
+                <span className="shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
+                  preview
+                </span>
+              )}
               <span className="ml-auto shrink-0 text-xs text-slate-400">
                 {formatDate(e.created_at)}
               </span>

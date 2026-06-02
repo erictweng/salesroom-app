@@ -4,11 +4,12 @@ A per-account "sales room" where a rep curates content for a buyer and sees
 identity-attributed engagement. Built on Next.js (App Router) + SQLite, backed by
 a local mock CRM server that stands in for Salesforce.
 
-This repository contains **P0 (backend spine)**, **P1 (seller portal)**, and
-**P2 (buyer loop)**: the CRM client, the SQLite store, session/auth, the
-events/rooms API, the rep-facing UI for curating a room, and the buyer-facing
-room that consumes content and emits identity-attributed engagement back to the
-rep. Insights and final polish (P3–P4) build on top of it.
+This repository contains **P0 (backend spine)**, **P1 (seller portal)**,
+**P2 (buyer loop)**, and **P3 (feed + insights)**: the CRM client, the SQLite
+store, session/auth, the events/rooms API, the rep-facing curation UI, the
+buyer-facing room that emits identity-attributed engagement, and the rep's
+auto-refreshing feed with deterministic insight cards. Final polish (P4) builds
+on top of it.
 
 ## Seller portal (P1)
 
@@ -148,6 +149,26 @@ All passwords are `demo1234`.
 `ROOM_VIEWED`, `RESOURCE_OPENED`, `RESOURCE_REVISITED`, `VIDEO_PLAYED`,
 `VIDEO_PROGRESS`, `VIDEO_COMPLETED`. Any other value is rejected with `400`.
 
+## Feed & insights (P3)
+
+The seller room builder shows an **auto-refreshing** activity feed plus four
+deterministic insight cards:
+
+- **Top stakeholder** — the buyer with the most events (tiebreak: latest
+  activity, then name).
+- **Most-viewed resource** — the content with the most interactions (same
+  tiebreak, then title).
+- **Last activity** — most recent event, with a unique-visitor count that
+  surfaces multi-threading (e.g., two buyers at one account).
+- **Suggested follow-up** — a templated next step mapped from the most-viewed
+  content's category (no LLM, fully deterministic).
+
+Insights count buyers only — the rep's own preview actions are excluded from the
+analysis (and shown in the feed tagged "preview"). The feed re-renders via
+`router.refresh()` on tab focus and on a ~15s interval, so a buyer action appears
+shortly after the rep looks back at the tab. All ordering uses server time, and a
+fresh room renders empty states rather than dividing by zero.
+
 ## Testing
 
 - **Unit tests** (Vitest + React Testing Library) cover the edge cases the seed
@@ -164,6 +185,7 @@ All passwords are `demo1234`.
   ```bash
   bash scripts/test-p1.sh   # seller: login → picker → create/seed → modules → role guard
   bash scripts/test-p2.sh   # buyer: login prompt, not-authorized/not-published, 6 events, rich feed
+  bash scripts/test-p3.sh   # insights: top stakeholder, most-viewed, follow-up, multi-buyer, rep-exclusion
   ```
 
 ## Design decisions & known limitations

@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { requireRep } from "@/server/guards";
 import { loadRoomData } from "@/server/loaders";
-import { getFeed } from "@/lib/repo";
+import { getFeed, getEventsForInsights } from "@/lib/repo";
+import { computeInsights } from "@/lib/insights";
 import { RoomControls } from "@/components/seller/RoomControls";
+import { FeedAutoRefresh } from "@/components/seller/FeedAutoRefresh";
 import { DealStrip } from "@/components/modules/DealStrip";
 import { AccountSnapshot } from "@/components/modules/AccountSnapshot";
 import { StakeholderMap } from "@/components/modules/StakeholderMap";
 import { ContentHub } from "@/components/modules/ContentHub";
+import { InsightsPanel } from "@/components/modules/InsightsPanel";
 import { ActivityFeed } from "@/components/modules/ActivityFeed";
 
 export const dynamic = "force-dynamic";
@@ -28,9 +31,22 @@ export default async function RoomBuilderPage({
   const contentTitles = Object.fromEntries(
     data.resources.map((r) => [r.content_id, r.content.title]),
   );
+  // Insights run over a wider event window and exclude the rep's own previews.
+  const contentMeta = Object.fromEntries(
+    data.resources.map((r) => [
+      r.content_id,
+      { title: r.content.title, category: r.content.category },
+    ]),
+  );
+  const insights = computeInsights(
+    getEventsForInsights(data.room.id),
+    contentMeta,
+    { excludeRoles: ["rep"] },
+  );
 
   return (
     <div className="space-y-6">
+      <FeedAutoRefresh />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <Link
@@ -54,6 +70,7 @@ export default async function RoomBuilderPage({
       <AccountSnapshot account={data.account} enrichment={data.enrichment} />
       <StakeholderMap contacts={data.contacts} />
       <ContentHub resources={data.resources} />
+      <InsightsPanel insights={insights} />
       <ActivityFeed events={events} contentTitles={contentTitles} />
     </div>
   );

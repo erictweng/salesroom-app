@@ -176,3 +176,15 @@ export function getFeed(roomId: number, limit = 100): EventRecord[] {
     )
     .all(roomId, limit) as EventRecord[];
 }
+
+/**
+ * Events for insight aggregation. Uses a wider window than the display feed so
+ * counts are accurate, while still bounding work at this scale.
+ */
+export function getEventsForInsights(roomId: number, limit = 1000): EventRecord[] {
+  return getDb()
+    .prepare(
+      "SELECT * FROM events WHERE room_id = ? ORDER BY created_at DESC, id DESC LIMIT ?",
+    )
+    .all(roomId, limit) as EventRecord[];
+}
