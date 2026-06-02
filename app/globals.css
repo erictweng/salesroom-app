@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+}
+
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+/* Deep-green hero gradient used by both portals, matching the screenshots. */
+.brand-hero {
+  background-image: linear-gradient(110deg, #022c22 0%, #064e3b 45%, #047857 100%);
+}
