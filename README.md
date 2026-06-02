@@ -183,6 +183,7 @@ fresh room renders empty states rather than dividing by zero.
   `npm run dev`, then:
 
   ```bash
+  bash scripts/test-p0.sh   # backend: auth, CRM proxy, events→sqlite→feed, 404/400, concurrency guard, read-only CRM
   bash scripts/test-p1.sh   # seller: login → picker → create/seed → modules → role guard
   bash scripts/test-p2.sh   # buyer: login prompt, not-authorized/not-published, 6 events, rich feed
   bash scripts/test-p3.sh   # insights: top stakeholder, most-viewed, follow-up, multi-buyer, rep-exclusion
