@@ -2,8 +2,8 @@ import type { Opportunity } from "./types";
 
 /**
  * All CRM opportunity stages are "open" (no Closed Won/Lost in the enum), so we
- * rank by how far along the deal is. Used by the DealStrip to surface the single
- * most relevant opportunity for an account.
+ * rank by how far along the deal is. Used to surface the single most relevant
+ * opportunity for an account (the Module A deal cue and Deal Overview).
  */
 const STAGE_RANK: Record<string, number> = {
   Negotiation: 4,

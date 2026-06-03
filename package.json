@@ -10,7 +10,8 @@
     "db:reset": "node scripts/reset-db.mjs",
     "seed": "node scripts/seed-demo.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:all": "bash scripts/test-all.sh"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
