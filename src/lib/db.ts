@@ -55,6 +55,21 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 CREATE INDEX IF NOT EXISTS idx_events_room ON events(room_id, created_at);
+
+-- Rep-only, Google-Docs-style notes: a timestamped, attributed feed per room,
+-- each note optionally targeting a section (e.g. "Stakeholder Map"). Never shown
+-- to buyers. Supersedes the legacy single rooms.internal_notes field.
+CREATE TABLE IF NOT EXISTS room_notes (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  room_id      INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+  author_email TEXT,
+  author_name  TEXT,
+  target       TEXT,
+  body         TEXT NOT NULL,
+  created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_notes_room ON room_notes(room_id, created_at);
 `;
 
 let _db: Database.Database | null = null;

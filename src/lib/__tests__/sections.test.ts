@@ -9,13 +9,14 @@ describe("orderKeys", () => {
   it("returns the default order when nothing is saved", () => {
     expect(orderKeys(null)).toEqual(DEFAULT_SECTION_ORDER);
     expect(orderKeys(undefined)).toEqual(DEFAULT_SECTION_ORDER);
-    // Default: account context + stakeholders first, content, deal+engagement, notes last.
+    // Default: account context + stakeholders, then deal, content, engagement.
+    // Deal Overview and Activity & Engagement are separate panels.
     expect(orderKeys(null)).toEqual([
       "snapshot",
       "stakeholders",
+      "deal",
       "content",
       "engagement",
-      "notes",
     ]);
   });
 
@@ -25,7 +26,7 @@ describe("orderKeys", () => {
       "content",
       "snapshot",
       "stakeholders",
-      "notes",
+      "deal",
     ]);
   });
 
@@ -34,8 +35,8 @@ describe("orderKeys", () => {
       "content",
       "snapshot",
       "stakeholders",
+      "deal",
       "engagement",
-      "notes",
     ]);
   });
 });

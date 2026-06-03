@@ -99,6 +99,20 @@ export interface Room {
   updated_at: string;
 }
 
+/**
+ * A rep-only note: timestamped, attributed to the signed-in rep, optionally
+ * tagged to a room section (target). Never exposed to buyers.
+ */
+export interface RoomNote {
+  id: number;
+  room_id: number;
+  author_email: string | null;
+  author_name: string | null;
+  target: string | null; // a section title, or null for "General"
+  body: string;
+  created_at: string;
+}
+
 export interface RoomResource {
   id: number;
   room_id: number;

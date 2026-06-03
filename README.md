@@ -18,8 +18,8 @@ Sign in as a rep at `/login`, then:
   it scales. One click opens the account's room, creating it (idempotently) and
   seeding it with the full content library if it doesn't exist yet.
 - **Room builder** (`/seller/rooms/[slug]`) is build-first: a compact
-  **engagement KPI strip** stays glanceable up top, and the four panels (Content
-  Hub, Account Snapshot, Stakeholder Map, Activity & Engagement) are
+  **engagement KPI strip** stays glanceable up top, and the five panels (Account
+  Snapshot, Stakeholder Map, Deal Overview, Content Hub, Activity & Engagement) are
   **collapsible** (state per browser) and **drag-to-reorder** — the panel order is
   saved **per room** (`rooms.section_order`, default order as fallback), with a
   "Reset layout" control. Each stakeholder is **clickable → a profile modal** with
@@ -29,12 +29,17 @@ Sign in as a rep at `/login`, then:
     when fields or enrichment are missing.
   - **B — Stakeholder Map**: contacts with the Champion highlighted, the primary
     contact starred, each colored by the CRM `engagement_score` (labeled "CRM
-    score" so it's never confused with live in-room activity).
+    score" so it's never confused with live in-room activity). Includes name search
+    and a role / minimum-CRM-score filter.
   - **C — Content Hub**: curated resources grouped by category, with an embedded,
     click-to-play YouTube player for videos.
+  - **D — Deal Overview**: the CRM pipeline for the account — each opportunity's
+    stage (a stepper), amount, close date, days-in-stage, owner, next step,
+    products, and competitors, plus a pipeline total. Its own panel, separate from
+    engagement, because pipeline state and live buyer behavior are two different
+    questions the rep acts on differently.
   - **E — Activity & Engagement**: the in-room feed (empty until buyers generate
-    events in P2; populated with insights in P3).
-  - Plus a one-line **deal context** strip (most-advanced open opportunity).
+    events in P2; populated with insights in P3) plus the analytics summary.
 
 All CRM reads happen in server components / server actions; the token never
 reaches the browser. Non-reps are sent to a friendly `/forbidden` page.
@@ -53,6 +58,16 @@ so re-categorizing never touches the shared catalog. All edits are optimistic an
 persist via server actions (one flattened order write + a category write when a
 card changes column); the buyer's view groups by the same effective category and
 order on next load.
+
+**Internal notes (rep-only).** A floating comment button at the bottom-right of the
+room opens a Google-Docs-style notes pane (`room_notes`). Each note is attributed
+to the signed-in rep and timestamped (e.g. _"Sarah · Stakeholder Map · 'This guy
+is at the top of the food chain!' — 10:08 am, Jun 7th, 2026"_), can optionally be
+tagged to a section, and is individually deletable (plus "Clear all", so there's
+no backlog). A red badge shows **unread** notes — anything added since the rep last
+opened the pane (tracked per browser); it clears on open. A tagged note is
+**clickable**: it closes the pane, expands the target section if collapsed, scrolls
+to it, and flashes a brief highlight. Notes are never loaded for the buyer view.
 
 ## Buyer loop (P2)
 
@@ -90,7 +105,60 @@ React re-renders don't flood the feed.
 - **Read-only CRM boundary.** The CRM is treated as a read-only system of record.
   The only non-GET call the app makes to it is `POST /api/auth/login`. Every app
   mutation (rooms, curated resources, engagement events) goes to **SQLite**.
-- **SQLite via better-sqlite3** for `rooms`, `room_resources`, and `events`.
+- **SQLite via better-sqlite3** for `rooms`, `room_resources`, `room_notes`, and
+  `events`.
+
+## Architecture & trade-offs
+
+Almost every backend choice here optimizes for a simple, fast, demoable
+single-node loop, deliberately trading away horizontal scale, caching, and
+multi-user concurrency. The honest tally:
+
+- **SQLite (better-sqlite3).** Buys a zero-config, single-file, fully
+  transactional store with a synchronous API — no connection pool, no ORM, no
+  network hop, and it's fast at this data scale. The cost: synchronous queries run
+  on the Node event loop, so a heavy query blocks every other request; SQLite
+  serializes writes (one writer at a time, even under WAL); and it's one file on
+  one machine, so you can't run multiple app instances against it or get managed
+  backups/replication. The first thing to swap (for Postgres) at real scale.
+- **Read-only CRM, all calls server-side.** The CRM stays the system of record,
+  the JWT never reaches the browser, and authorization is delegated to the CRM's
+  own 403 scoping rather than a parallel ACL. The cost: every room render fans out
+  several CRM calls with no caching, so the same account/contacts/content are
+  re-fetched on every load and every ~15s refresh, and we're coupled to CRM
+  latency and uptime. It also means we can't persist anything the CRM doesn't
+  expose (why custom content uploads were dropped).
+- **Server Actions instead of a REST/GraphQL API.** Far less boilerplate,
+  type-safe end to end, nothing to version. The cost: the backend isn't consumable
+  by non-Next clients (mobile, third parties), and it's awkward to test in
+  isolation — which is why a few `/api` routes are kept purely so the HTTP smoke
+  scripts have stable endpoints, duplicating a little logic.
+- **Insights computed on every read.** `computeInsights` runs over the event list
+  each render, so numbers are always fresh, there's no materialized state to
+  invalidate, and the function is pure (trivially testable). The cost: it's
+  O(events) per request (up to ~1000 rows), recomputed on every render and
+  refresh, with no memoization — at higher volume you'd want rolled-up aggregates.
+- **Event retention by prune-on-insert (7 days / 500 per room).** Keeps the table
+  bounded with no cron or background worker — simple and deterministic. The cost:
+  two `DELETE`s run synchronously on every insert (wasteful on a hot write path),
+  and old events are gone for good — no archival, so no long-term history.
+- **localStorage for some UI state** (panel collapse, the notes "unread" marker).
+  Instant, no round-trip. The cost: it's per-browser, not per-user on the server,
+  so "unread" doesn't follow you across devices and resets on a cache clear — a
+  convenience, not authoritative data.
+- **Optimistic UI with id-signature resync** (notes, reordering). Snappy, and it
+  survives the auto-refresh. The cost: brief client/server divergence windows, and
+  concurrent edits are last-write-wins with no conflict resolution — fine for one
+  rep per room, not collaborative editing.
+- **Hand-rolled migrations.** `migrate()` does guarded additive `ALTER TABLE`s and
+  creates new tables via `CREATE TABLE IF NOT EXISTS`. Dependency-free and simple,
+  but there's no version tracking, no down-migrations, and complex changes
+  (renames, type changes, backfills) would get painful.
+
+For production the first three changes would be: a caching layer in front of the
+CRM, moving insights and pruning off the request path (precomputed aggregates +
+a background job), and swapping SQLite for Postgres. See **Design decisions &
+known limitations** below for the product-level counterparts to these.
 
 ## Prerequisites
 
@@ -132,8 +200,13 @@ The app runs on http://localhost:3000.
 | `CRM_BASE_URL`   | `http://localhost:8080`     | Base URL of the mock CRM server           |
 | `SESSION_SECRET` | dev placeholder             | Reserved for signing the session cookie   |
 | `DATABASE_PATH`  | `./data/salesroom.db`       | SQLite file location (auto-created)        |
+| `DEMO_ACCOUNTS`  | unset (`0`)                 | Pad the picker with N synthetic accounts (scale testing) |
 
 Reset the local database at any time with `npm run db:reset`.
+
+Set `DEMO_ACCOUNTS=100` to stress-test the account picker's search/filter/grid-list
+at scale. These synthetic accounts are display-only (their "Create room" is
+disabled, since they have no CRM record); the real CRM accounts still work.
 
 ## Demo accounts
 
@@ -188,6 +261,15 @@ analysis (and shown in the feed tagged "preview"). The feed re-renders via
 shortly after the rep looks back at the tab. All ordering uses server time, and a
 fresh room renders empty states rather than dividing by zero.
 
+The engagement section also includes an **Analytics** summary — an activity-type
+breakdown (inline bars), top resources, and top people — and the activity feed
+**scrolls** within a fixed height so a busy room doesn't stretch the page.
+
+**Event retention.** To keep storage bounded, events are pruned on insert: anything
+older than `EVENT_RETENTION_DAYS` (7) is deleted, and each room keeps at most
+`MAX_EVENTS_PER_ROOM` (500) of its most recent events. Insights/analytics therefore
+reflect roughly the last week of activity. (Both constants live in `src/lib/repo.ts`.)
+
 ## Testing
 
 - **Unit tests** (Vitest + React Testing Library) cover the edge cases the seed
@@ -226,7 +308,7 @@ npm run seed
 ## Pre-submission QA checklist
 
 - [x] Fresh clone + README steps run against the CRM binary
-- [x] All four modules (Account Snapshot, Stakeholder Map, Content Hub, Activity/Insights) visible and populated
+- [x] All five panels (Account Snapshot, Stakeholder Map, Deal Overview, Content Hub, Activity/Insights) visible and populated; internal-notes pane works
 - [x] All 6 event types fire and are accepted, no duplicates (client dedup + server validation)
 - [x] Multi-threading: two Velora buyers both appear, attributed, in the feed/insights
 - [x] Read-only CRM confirmed (only non-GET CRM call is auth/login — static-checked in `test-p0.sh`)
@@ -253,6 +335,12 @@ npm run seed
   existing one instead of duplicating. A `UNIQUE(account_id)` index enforces
   this, and room creation has a concurrency guard: if two requests race, the
   loser returns the winner's room rather than surfacing a constraint error.
+- **Account picker renders client-side.** Search, filters, and the grid/list view
+  all run over the full account list in the browser. That's fine for the CRM's
+  handful of accounts (and verified smooth at 100+ via `DEMO_ACCOUNTS`), but a
+  real deployment with thousands of accounts would need server-side pagination,
+  query-side filtering, and list virtualization. Same applies to the activity
+  feed, which is capped at a recent window rather than paginated.
 - **One session cookie per browser.** Rep and buyer sessions share the
   `sf_session` cookie, so logging in as one role replaces the other in the same
   browser. Use two browsers / incognito to exercise both roles at once.

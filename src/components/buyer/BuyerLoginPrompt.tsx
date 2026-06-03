@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { DEMO_BUYERS, DEMO_PASSWORD } from "@/lib/demoLogins";
 
 /**
  * Inline login shown when an unauthenticated visitor opens a buyer room. On
@@ -9,10 +10,6 @@ import { useRouter } from "next/navigation";
  * re-runs — now with a session — and renders the room (or the right notice).
  * Demo buyers are surfaced as quick-fill chips so the room is easy to evaluate.
  */
-const DEMO_BUYERS = [
-  "d.park@meridianrobotics.com",
-  "p.sharma@velorahealth.com",
-];
 
 export function BuyerLoginPrompt({ slug }: { slug: string }) {
   const router = useRouter();
@@ -107,19 +104,22 @@ export function BuyerLoginPrompt({ slug }: { slug: string }) {
           </button>
 
           <div className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-500">
-            <p className="font-medium text-slate-600">Demo buyers (password: demo1234)</p>
-            <div className="mt-1 flex flex-wrap gap-2">
+            <p className="font-medium text-slate-600">
+              Demo buyers (password: {DEMO_PASSWORD})
+            </p>
+            <div className="mt-1 flex flex-col gap-1">
               {DEMO_BUYERS.map((b) => (
                 <button
-                  key={b}
+                  key={b.email}
                   type="button"
                   onClick={() => {
-                    setEmail(b);
-                    setPassword("demo1234");
+                    setEmail(b.email);
+                    setPassword(DEMO_PASSWORD);
                   }}
-                  className="rounded border border-slate-200 bg-white px-2 py-0.5 hover:border-brand-400"
+                  className="flex items-center justify-between gap-2 rounded border border-slate-200 bg-white px-2 py-1 text-left hover:border-brand-400"
                 >
-                  {b}
+                  <span className="truncate">{b.email}</span>
+                  <span className="shrink-0 text-slate-400">{b.account}</span>
                 </button>
               ))}
             </div>

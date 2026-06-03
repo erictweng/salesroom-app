@@ -9,7 +9,7 @@ import type { CrmUser } from "@/lib/types";
 export function SellerHeader({ user }: { user: CrmUser }) {
   return (
     <header className="brand-hero text-white">
-      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <a href="/seller" className="text-lg font-semibold tracking-tight">
           secureframe <span className="font-normal text-brand-200">Salesroom</span>
         </a>

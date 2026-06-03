@@ -12,12 +12,15 @@ import {
   setResourceOrder,
   setResourceCategory,
   setSectionOrder,
-  setInternalNotes,
+  addNote,
+  deleteNote,
+  clearNotes,
 } from "@/lib/repo";
 import { clearSession } from "@/lib/session";
 import { isKnownCategory } from "@/lib/categories";
+import { normalizeTarget } from "@/lib/notes";
 import { SECTION_KEYS } from "@/lib/sections";
-import type { RoomStatus } from "@/lib/types";
+import type { RoomNote, RoomStatus } from "@/lib/types";
 
 /**
  * One-click "open/create" from the account picker. Idempotent: re-running for an
@@ -126,15 +129,47 @@ export async function resetSectionLayoutAction(slug: string): Promise<void> {
   setSectionOrder(room.id, null);
 }
 
-/** Save rep-only internal notes for a room (rep-only). Optimistic; no revalidate. */
-export async function saveNotesAction(
+/**
+ * Add a rep note to a room (rep-only). The author is taken from the session — a
+ * note is always attributed to the signed-in rep, never client-supplied. Returns
+ * the persisted note (with server timestamp) so the drawer can show it instantly.
+ */
+export async function addNoteAction(
   slug: string,
-  notes: string,
+  target: string,
+  body: string,
+): Promise<RoomNote | null> {
+  const { user } = requireRep();
+  const room = getRoomBySlug(slug);
+  if (!room) return null;
+  const text = typeof body === "string" ? body.trim() : "";
+  if (!text) return null;
+  return addNote({
+    roomId: room.id,
+    authorEmail: user.email,
+    authorName: user.name,
+    target: normalizeTarget(target),
+    body: text,
+  });
+}
+
+/** Delete a single rep note (rep-only). Optimistic; no revalidate. */
+export async function deleteNoteAction(
+  slug: string,
+  noteId: number,
 ): Promise<void> {
   requireRep();
   const room = getRoomBySlug(slug);
+  if (!room || typeof noteId !== "number") return;
+  deleteNote(room.id, noteId);
+}
+
+/** Delete all rep notes for a room (rep-only) — the "Clear all" action. */
+export async function clearNotesAction(slug: string): Promise<void> {
+  requireRep();
+  const room = getRoomBySlug(slug);
   if (!room) return;
-  setInternalNotes(room.id, typeof notes === "string" ? notes : "");
+  clearNotes(room.id);
 }
 
 export async function logoutAction(): Promise<void> {

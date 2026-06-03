@@ -18,7 +18,15 @@ const {
   setResourceCategory,
   setSectionOrder,
   setInternalNotes,
+  addNote,
+  listNotes,
+  deleteNote,
+  clearNotes,
+  insertEvent,
+  getFeed,
+  pruneRoomEvents,
 } = await import("../repo");
+const { getDb } = await import("../db");
 
 const { room } = createOrGetRoom({
   accountId: "acc_test",
@@ -101,5 +109,80 @@ describe("room resource reorder + hide", () => {
     expect(getRoomBySlug(room.slug)!.internal_notes).toBe(
       "competitor X is in play; push security",
     );
+  });
+});
+
+describe("room notes feed", () => {
+  const { room } = createOrGetRoom({
+    accountId: "acc_notes",
+    title: "Notes Room",
+    createdBy: "rep@example.com",
+    seedContentIds: [],
+  });
+
+  it("adds an attributed, timestamped note and returns the row", () => {
+    const note = addNote({
+      roomId: room.id,
+      authorEmail: "sarah@x.com",
+      authorName: "Sarah",
+      target: "Stakeholder Map",
+      body: "This guy at the top of the food chain!",
+    });
+    expect(note.id).toBeGreaterThan(0);
+    expect(note.author_name).toBe("Sarah");
+    expect(note.target).toBe("Stakeholder Map");
+    expect(note.body).toMatch(/food chain/);
+    expect(note.created_at).toMatch(/^\d{4}-/); // ISO timestamp
+  });
+
+  it("stores a null target for an untagged (General) note", () => {
+    const note = addNote({ roomId: room.id, authorName: "Marcus", body: "ping" });
+    expect(note.target).toBeNull();
+  });
+
+  it("lists notes newest first", () => {
+    const list = listNotes(room.id);
+    expect(list.length).toBe(2);
+    expect(list[0].body).toBe("ping"); // most recently added
+  });
+
+  it("deletes a single note, scoped to its room", () => {
+    const list = listNotes(room.id);
+    deleteNote(room.id, list[0].id);
+    expect(listNotes(room.id).length).toBe(1);
+  });
+
+  it("clears all notes for a room", () => {
+    addNote({ roomId: room.id, authorName: "Sarah", body: "another" });
+    clearNotes(room.id);
+    expect(listNotes(room.id).length).toBe(0);
+  });
+});
+
+describe("event retention", () => {
+  const { room } = createOrGetRoom({
+    accountId: "acc_prune",
+    title: "Prune Room",
+    createdBy: "rep@example.com",
+    seedContentIds: [],
+  });
+
+  it("drops events older than the retention window on insert", () => {
+    // A raw event well outside the 7-day window.
+    getDb()
+      .prepare(
+        "INSERT INTO events (room_id, type, created_at) VALUES (?, 'ROOM_VIEWED', ?)",
+      )
+      .run(room.id, "2020-01-01T00:00:00.000Z");
+    insertEvent({ roomId: room.id, type: "ROOM_VIEWED" }); // triggers prune
+    expect(
+      getFeed(room.id, 100).every((e) => e.created_at > "2021"),
+    ).toBe(true);
+  });
+
+  it("trims to the most recent N per room", () => {
+    for (let i = 0; i < 6; i++) insertEvent({ roomId: room.id, type: "ROOM_VIEWED" });
+    pruneRoomEvents(room.id, { maxPerRoom: 3 });
+    expect(getFeed(room.id, 100).length).toBe(3);
   });
 });

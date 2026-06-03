@@ -4,7 +4,13 @@
  */
 
 import { getDb } from "./db";
-import type { EventRecord, Room, RoomResource, RoomStatus } from "./types";
+import type {
+  EventRecord,
+  Room,
+  RoomNote,
+  RoomResource,
+  RoomStatus,
+} from "./types";
 
 /* ------------------------------- slugs -------------------------------- */
 
@@ -161,11 +167,60 @@ export function setSectionOrder(roomId: number, keys: string[] | null): void {
     .run(keys ? JSON.stringify(keys) : null, roomId);
 }
 
-/** Save the room's rep-only internal notes (never shown to buyers). */
+/** Save the room's rep-only internal notes (legacy single-field; kept for back-compat). */
 export function setInternalNotes(roomId: number, notes: string): void {
   getDb()
     .prepare("UPDATE rooms SET internal_notes = ? WHERE id = ?")
     .run(notes, roomId);
+}
+
+/* --------------------------- room notes (feed) ------------------------- */
+
+/** Add a rep note to a room and return the persisted row (with its timestamp). */
+export function addNote(params: {
+  roomId: number;
+  authorEmail?: string | null;
+  authorName?: string | null;
+  target?: string | null;
+  body: string;
+}): RoomNote {
+  const db = getDb();
+  const info = db
+    .prepare(
+      `INSERT INTO room_notes (room_id, author_email, author_name, target, body)
+       VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(
+      params.roomId,
+      params.authorEmail ?? null,
+      params.authorName ?? null,
+      params.target ?? null,
+      params.body,
+    );
+  return db
+    .prepare("SELECT * FROM room_notes WHERE id = ?")
+    .get(Number(info.lastInsertRowid)) as RoomNote;
+}
+
+/** All notes for a room, newest first. */
+export function listNotes(roomId: number): RoomNote[] {
+  return getDb()
+    .prepare(
+      "SELECT * FROM room_notes WHERE room_id = ? ORDER BY created_at DESC, id DESC",
+    )
+    .all(roomId) as RoomNote[];
+}
+
+/** Delete a single note (scoped to the room so ids can't cross rooms). */
+export function deleteNote(roomId: number, noteId: number): void {
+  getDb()
+    .prepare("DELETE FROM room_notes WHERE id = ? AND room_id = ?")
+    .run(noteId, roomId);
+}
+
+/** Delete every note in a room ("Clear all" — no backlog). */
+export function clearNotes(roomId: number): void {
+  getDb().prepare("DELETE FROM room_notes WHERE room_id = ?").run(roomId);
 }
 
 /** Show or hide a single resource in a room (hidden ones are excluded for buyers). */
@@ -241,6 +296,35 @@ export interface InsertEventInput {
   metadata?: Record<string, unknown> | null;
 }
 
+/** Retention: events expire after this many days... */
+export const EVENT_RETENTION_DAYS = 7;
+/** ...and a room keeps at most this many events regardless of age. */
+export const MAX_EVENTS_PER_ROOM = 500;
+
+/**
+ * Bound a room's event storage: delete anything older than the retention window,
+ * then trim to the most recent N. Runs after each insert so the table stays
+ * small. (Pruning is per room; the format-matching strftime keeps the date
+ * comparison exact against our ISO `created_at`.)
+ */
+export function pruneRoomEvents(
+  roomId: number,
+  opts?: { days?: number; maxPerRoom?: number },
+): void {
+  const days = opts?.days ?? EVENT_RETENTION_DAYS;
+  const max = opts?.maxPerRoom ?? MAX_EVENTS_PER_ROOM;
+  const db = getDb();
+  db.prepare(
+    `DELETE FROM events WHERE room_id = ?
+       AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-${Number(days)} days')`,
+  ).run(roomId);
+  db.prepare(
+    `DELETE FROM events WHERE room_id = ? AND id NOT IN (
+       SELECT id FROM events WHERE room_id = ? ORDER BY created_at DESC, id DESC LIMIT ?
+     )`,
+  ).run(roomId, roomId, max);
+}
+
 export function insertEvent(input: InsertEventInput): EventRecord {
   const db = getDb();
   const info = db
@@ -257,9 +341,11 @@ export function insertEvent(input: InsertEventInput): EventRecord {
       actor_role: input.actorRole ?? null,
       metadata: input.metadata ? JSON.stringify(input.metadata) : null,
     });
-  return getDb()
+  const row = getDb()
     .prepare("SELECT * FROM events WHERE id = ?")
     .get(Number(info.lastInsertRowid)) as EventRecord;
+  pruneRoomEvents(input.roomId);
+  return row;
 }
 
 /** Engagement feed for a room, newest first, capped to a recent window. */

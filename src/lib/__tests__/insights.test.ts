@@ -18,8 +18,8 @@ function ev(p: Partial<EventRecord>): EventRecord {
 }
 
 const meta: Record<string, ContentMeta> = {
-  cnt_1: { title: "Pricing Sheet", category: "Pricing" },
-  cnt_2: { title: "Platform Demo", category: "Product Demo" },
+  cnt_1: { title: "Pricing Sheet", category: "Custom Proposal" },
+  cnt_2: { title: "Platform Demo", category: "Product Demos" },
 };
 
 describe("computeInsights", () => {
@@ -96,6 +96,22 @@ describe("computeInsights", () => {
     expect(r.mostViewedResource).toBeNull(); // the only content event was the rep's
   });
 
+  it("produces analytics breakdowns (by type, top people, top resources)", () => {
+    const r = computeInsights(
+      [
+        ev({ actor_email: "a@x.com", actor_name: "Alice", type: "ROOM_VIEWED" }),
+        ev({ actor_email: "a@x.com", actor_name: "Alice", type: "VIDEO_PLAYED", content_id: "cnt_2" }),
+        ev({ actor_email: "b@x.com", actor_name: "Bob", type: "RESOURCE_OPENED", content_id: "cnt_1" }),
+      ],
+      meta,
+    );
+    expect(r.eventsByType.ROOM_VIEWED).toBe(1);
+    expect(r.eventsByType.VIDEO_PLAYED).toBe(1);
+    expect(r.eventsByType.RESOURCE_OPENED).toBe(1);
+    expect(r.topStakeholders[0]).toEqual({ name: "Alice", eventCount: 2 });
+    expect(r.topResources.map((x) => x.contentId)).toContain("cnt_2");
+  });
+
   it("computes last activity as the maximum timestamp", () => {
     const r = computeInsights(
       [
@@ -106,5 +122,51 @@ describe("computeInsights", () => {
       meta,
     );
     expect(r.lastActivityAt).toBe("2026-03-01T00:00:00.000Z");
+  });
+
+  it("builds a zero-filled per-day trend anchored to `now`", () => {
+    const r = computeInsights(
+      [
+        ev({ created_at: "2026-03-05T10:00:00.000Z" }),
+        ev({ created_at: "2026-03-05T11:00:00.000Z" }),
+        ev({ created_at: "2026-03-07T09:00:00.000Z" }),
+      ],
+      meta,
+      { now: "2026-03-07T23:00:00.000Z" },
+    );
+    expect(r.eventsByDay).toHaveLength(7);
+    expect(r.eventsByDay[0].date).toBe("2026-03-01");
+    expect(r.eventsByDay[6].date).toBe("2026-03-07");
+    const byDate = Object.fromEntries(r.eventsByDay.map((d) => [d.date, d.count]));
+    expect(byDate["2026-03-05"]).toBe(2);
+    expect(byDate["2026-03-07"]).toBe(1);
+    expect(byDate["2026-03-06"]).toBe(0); // zero-filled gap
+  });
+
+  it("groups content engagement by category (desc)", () => {
+    const r = computeInsights(
+      [
+        ev({ type: "RESOURCE_OPENED", content_id: "cnt_1" }), // Pricing
+        ev({ type: "VIDEO_PLAYED", content_id: "cnt_2" }), // Product Demo
+        ev({ type: "VIDEO_PROGRESS", content_id: "cnt_2" }), // Product Demo
+        ev({ type: "ROOM_VIEWED" }), // no content → ignored
+      ],
+      meta,
+    );
+    expect(r.eventsByCategory[0]).toEqual({ category: "Product Demos", count: 2 });
+    expect(r.eventsByCategory).toContainEqual({ category: "Custom Proposal", count: 1 });
+  });
+
+  it("lists per-person engagement totals (desc)", () => {
+    const r = computeInsights(
+      [
+        ev({ actor_email: "a@x.com", actor_name: "Alice" }),
+        ev({ actor_email: "a@x.com", actor_name: "Alice" }),
+        ev({ actor_email: "b@x.com", actor_name: "Bob" }),
+      ],
+      meta,
+    );
+    expect(r.peopleEngagement[0]).toEqual({ name: "Alice", eventCount: 2 });
+    expect(r.peopleEngagement[1]).toEqual({ name: "Bob", eventCount: 1 });
   });
 });

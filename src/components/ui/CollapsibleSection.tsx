@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { EXPAND_SECTION_EVENT } from "@/lib/notes";
 
 /**
  * A titled section the rep can collapse to cut on-screen noise. Open/closed state
@@ -18,6 +19,8 @@ export function CollapsibleSection({
   action,
   dragHandleProps,
   nested = false,
+  id,
+  className,
   children,
 }: {
   title: string;
@@ -26,6 +29,10 @@ export function CollapsibleSection({
   action?: ReactNode;
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
   nested?: boolean;
+  /** Optional DOM id (e.g. an anchor so notes can scroll/jump to this panel). */
+  id?: string;
+  /** Extra classes on the root (e.g. scroll-margin for anchored jumps). */
+  className?: string;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -37,6 +44,24 @@ export function CollapsibleSection({
     } catch {
       /* storage unavailable */
     }
+  }, [storageKey]);
+
+  // Another component (e.g. a note jumping to its section) can request this
+  // section be expanded. We open it and persist so it stays open.
+  useEffect(() => {
+    const onExpand = (e: Event) => {
+      const key = (e as CustomEvent<{ storageKey?: string }>).detail?.storageKey;
+      if (key !== storageKey) return;
+      setOpen(true);
+      try {
+        window.localStorage.setItem(`collapse:${storageKey}`, "1");
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener(EXPAND_SECTION_EVENT, onExpand as EventListener);
+    return () =>
+      window.removeEventListener(EXPAND_SECTION_EVENT, onExpand as EventListener);
   }, [storageKey]);
 
   function toggle() {
@@ -53,9 +78,17 @@ export function CollapsibleSection({
 
   return (
     <section
-      className={
-        nested ? "" : "rounded-xl border border-slate-200 bg-white shadow-sm"
-      }
+      id={id}
+      className={[
+        nested ? "" : "rounded-xl border border-slate-200 bg-white shadow-sm",
+        // In a stretch grid (e.g. the side-by-side top row), a collapsed panel
+        // shouldn't stretch to match an expanded neighbor — pin it to the top so
+        // it stays header-height. No effect outside a stretch context.
+        open ? "" : "self-start",
+        className ?? "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <div
         className={`flex items-center justify-between ${nested ? "py-2" : "px-5 py-3"}`}

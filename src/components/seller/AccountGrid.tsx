@@ -33,16 +33,49 @@ export function AccountGrid({ entries }: { entries: DashboardEntry[] }) {
   const [view, setView] = useState<View>("grid");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  // Favorites: a per-browser set of account ids (localStorage). `favoritesOnly`
+  // is a filter; `poppedId` briefly drives the star's pop animation.
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [poppedId, setPoppedId] = useState<string | null>(null);
+
   const popoverRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem("accountView");
       if (saved === "grid" || saved === "list") setView(saved);
+      const favs = window.localStorage.getItem("accountFavorites");
+      if (favs) {
+        const arr = JSON.parse(favs);
+        if (Array.isArray(arr)) setFavorites(new Set(arr.filter((x) => typeof x === "string")));
+      }
     } catch {
       /* ignore */
     }
   }, []);
+
+  function toggleFavorite(id: string) {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      const willFavorite = !next.has(id);
+      if (willFavorite) next.add(id);
+      else next.delete(id);
+      try {
+        window.localStorage.setItem("accountFavorites", JSON.stringify([...next]));
+      } catch {
+        /* ignore */
+      }
+      // Pop only when turning a favorite on.
+      if (willFavorite) {
+        setPoppedId(id);
+        window.setTimeout(() => {
+          setPoppedId((cur) => (cur === id ? null : cur));
+        }, 320);
+      }
+      return next;
+    });
+  }
 
   // Close the filter popover on outside click / Escape.
   useEffect(() => {
@@ -93,6 +126,7 @@ export function AccountGrid({ entries }: { entries: DashboardEntry[] }) {
     if (stage !== "all" && account.account_stage !== stage) return false;
     if ((account.icp_fit_score ?? 0) < icpMin) return false;
     if (status !== "all" && statusOf(room) !== status) return false;
+    if (favoritesOnly && !favorites.has(account.id)) return false;
     return true;
   });
 
@@ -100,13 +134,15 @@ export function AccountGrid({ entries }: { entries: DashboardEntry[] }) {
     (industry !== "all" ? 1 : 0) +
     (stage !== "all" ? 1 : 0) +
     (icpMin > 0 ? 1 : 0) +
-    (status !== "all" ? 1 : 0);
+    (status !== "all" ? 1 : 0) +
+    (favoritesOnly ? 1 : 0);
 
   function clearFilters() {
     setIndustry("all");
     setStage("all");
     setIcpMin(0);
     setStatus("all");
+    setFavoritesOnly(false);
   }
 
   const selectClass =
@@ -226,6 +262,18 @@ export function AccountGrid({ entries }: { entries: DashboardEntry[] }) {
                   </select>
                 </label>
 
+                <label className="flex cursor-pointer items-center gap-2 pt-1">
+                  <input
+                    type="checkbox"
+                    checked={favoritesOnly}
+                    onChange={(e) => setFavoritesOnly(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+                  />
+                  <span className="flex items-center gap-1 text-sm text-slate-600">
+                    <Star filled className="h-4 w-4 text-amber-400" /> Favorites only
+                  </span>
+                </label>
+
                 <div className="flex items-center justify-between pt-1">
                   <button
                     onClick={clearFilters}
@@ -273,13 +321,25 @@ export function AccountGrid({ entries }: { entries: DashboardEntry[] }) {
       ) : view === "grid" ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((entry) => (
-            <AccountCard key={entry.account.id} entry={entry} />
+            <AccountCard
+              key={entry.account.id}
+              entry={entry}
+              favorited={favorites.has(entry.account.id)}
+              popped={poppedId === entry.account.id}
+              onToggleFavorite={() => toggleFavorite(entry.account.id)}
+            />
           ))}
         </div>
       ) : (
         <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 bg-white">
           {filtered.map((entry) => (
-            <AccountRow key={entry.account.id} entry={entry} />
+            <AccountRow
+              key={entry.account.id}
+              entry={entry}
+              favorited={favorites.has(entry.account.id)}
+              popped={poppedId === entry.account.id}
+              onToggleFavorite={() => toggleFavorite(entry.account.id)}
+            />
           ))}
         </div>
       )}
@@ -319,10 +379,24 @@ function OpenButton({ entry }: { entry: DashboardEntry }) {
   );
 }
 
-function AccountCard({ entry }: { entry: DashboardEntry }) {
+function AccountCard({
+  entry,
+  favorited,
+  popped,
+  onToggleFavorite,
+}: {
+  entry: DashboardEntry;
+  favorited: boolean;
+  popped: boolean;
+  onToggleFavorite: () => void;
+}) {
   const { account } = entry;
   return (
-    <Card className="flex flex-col p-5">
+    <Card
+      className="flex select-none flex-col p-5"
+      onDoubleClick={onToggleFavorite}
+      title="Double-click to favorite"
+    >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 className="truncate text-base font-semibold text-slate-900">
@@ -332,7 +406,10 @@ function AccountCard({ entry }: { entry: DashboardEntry }) {
             {account.industry} · {account.hq_location}
           </p>
         </div>
-        <StatusBadge room={entry.room} />
+        <div className="flex shrink-0 items-center gap-2">
+          <FavStar favorited={favorited} popped={popped} onToggle={onToggleFavorite} />
+          <StatusBadge room={entry.room} />
+        </div>
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-y-2 text-sm">
@@ -355,10 +432,25 @@ function AccountCard({ entry }: { entry: DashboardEntry }) {
   );
 }
 
-function AccountRow({ entry }: { entry: DashboardEntry }) {
+function AccountRow({
+  entry,
+  favorited,
+  popped,
+  onToggleFavorite,
+}: {
+  entry: DashboardEntry;
+  favorited: boolean;
+  popped: boolean;
+  onToggleFavorite: () => void;
+}) {
   const { account } = entry;
   return (
-    <div className="flex items-center gap-4 px-4 py-3">
+    <div
+      className="flex select-none items-center gap-4 px-4 py-3"
+      onDoubleClick={onToggleFavorite}
+      title="Double-click to favorite"
+    >
+      <FavStar favorited={favorited} popped={popped} onToggle={onToggleFavorite} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate font-medium text-slate-900">
@@ -375,6 +467,57 @@ function AccountRow({ entry }: { entry: DashboardEntry }) {
       </div>
       <OpenButton entry={entry} />
     </div>
+  );
+}
+
+/** A gold-star favorite toggle. Stops propagation so it never opens/creates a room. */
+function FavStar({
+  favorited,
+  popped,
+  onToggle,
+}: {
+  favorited: boolean;
+  popped: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onToggle();
+      }}
+      onDoubleClick={(e) => e.stopPropagation()}
+      aria-pressed={favorited}
+      aria-label={favorited ? "Remove from favorites" : "Add to favorites"}
+      title={favorited ? "Favorited" : "Add to favorites"}
+      className="shrink-0 rounded-full p-1 transition hover:bg-amber-50"
+    >
+      <Star
+        filled={favorited}
+        className={`h-5 w-5 ${favorited ? "text-amber-400" : "text-slate-300 hover:text-amber-300"} ${
+          popped ? "animate-sr-pop" : ""
+        }`}
+      />
+    </button>
+  );
+}
+
+/** Star glyph — gold-filled when favorited, outline otherwise. */
+function Star({ filled, className }: { filled?: boolean; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 2.5l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.8 6.2 20.9l1.1-6.5L2.6 9.8l6.5-.9z" />
+    </svg>
   );
 }
 

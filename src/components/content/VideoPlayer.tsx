@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { youTubeEmbedUrl } from "@/lib/youtube";
 import { postEvent, firstTimeThisSession } from "@/lib/track";
 import { thresholdsToFire, watchedPercent } from "@/lib/progress";
+import { formatDuration } from "@/lib/format";
 import type { EventType } from "@/lib/events";
 
 /** When present, the player emits attributed engagement events for this room/resource. */
@@ -50,91 +51,58 @@ function loadYouTubeApi(): Promise<void> {
   return apiPromise;
 }
 
-const CENTER_W = 640; // centered/expanded width
-const PIP_W = 360; // docked picture-in-picture width
-const HEADER = 40;
-const MARGIN = 16;
-
-type Box = { w: number; h: number };
-type Pos = { x: number; y: number };
-
-const clamp = (v: number, min: number, max: number) =>
-  Math.max(min, Math.min(max, v));
-
-function boxFor(docked: boolean): Box {
-  const vw = typeof window !== "undefined" ? window.innerWidth : 1024;
-  const w = Math.min(docked ? PIP_W : CENTER_W, vw - MARGIN * 2);
-  return { w, h: Math.round((w * 9) / 16) + HEADER };
-}
-
-/** Snap the popup to whichever viewport corner its center is closest to. */
-function nearestCorner(pos: Pos, box: Box): Pos {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const right = vw - box.w - MARGIN;
-  const bottom = vh - box.h - MARGIN;
-  const corners: Pos[] = [
-    { x: MARGIN, y: MARGIN },
-    { x: right, y: MARGIN },
-    { x: MARGIN, y: bottom },
-    { x: right, y: bottom },
-  ];
-  const cx = pos.x + box.w / 2;
-  const cy = pos.y + box.h / 2;
-  let best = corners[0];
-  let bestD = Infinity;
-  for (const c of corners) {
-    const d = (c.x + box.w / 2 - cx) ** 2 + (c.y + box.h / 2 - cy) ** 2;
-    if (d < bestD) {
-      bestD = d;
-      best = c;
-    }
-  }
-  return best;
+/** The little red YouTube glyph used in the source line. */
+function YouTubeGlyph() {
+  return (
+    <span className="inline-flex h-3.5 w-5 items-center justify-center rounded-[3px] bg-red-600">
+      <span className="ml-[1px] border-y-[3px] border-l-[5px] border-y-transparent border-l-white" />
+    </span>
+  );
 }
 
 /**
- * A content video. Clicking the thumbnail opens a player popup CENTERED on
- * screen; dragging it snaps ("magnetizes") to the nearest corner and shrinks it
- * to a picture-in-picture window. The popup is rendered through a portal to
- * <body>, so it keeps playing while the buyer navigates back through the
- * resources. With `tracking` (buyer room) it builds a YT.Player and emits
- * VIDEO_PLAYED / PROGRESS (25/50/75) / COMPLETED; otherwise it's a plain embed,
- * which is also the fallback if the IFrame API can't load.
+ * A content video. Clicking the thumbnail opens a Google-style video modal: a
+ * dark full-screen overlay with a back arrow, the title, a "YouTube" source line
+ * + pill (linking out to the original), and a large 16:9 player, with the
+ * description and type/duration below. Closes via the back arrow, the backdrop,
+ * or Escape.
+ *
+ * With `tracking` (buyer room) it builds a YT.Player and emits VIDEO_PLAYED /
+ * PROGRESS (25/50/75) / COMPLETED; otherwise it's a plain embed, which is also
+ * the fallback if the IFrame API can't load.
  */
 export function VideoPlayer({
   videoId,
   title,
   thumbnail,
+  description,
+  durationSeconds,
   tracking,
+  variant = "thumbnail",
 }: {
   videoId: string;
   title: string;
   thumbnail?: string | null;
+  description?: string | null;
+  durationSeconds?: number | null;
   tracking?: VideoTracking;
+  /** "thumbnail" = full poster button (default); "link" = compact ▶ Preview. */
+  variant?: "thumbnail" | "link";
 }) {
   const [open, setOpen] = useState(false);
   const [useFallback, setUseFallback] = useState(false);
-  const [pos, setPos] = useState<Pos | null>(null);
-  const [box, setBox] = useState<Box>({ w: CENTER_W, h: 0 });
-  const [dragging, setDragging] = useState(false);
-  // false = centered/expanded (modal-like); true = docked corner PiP (persists).
-  const [docked, setDocked] = useState(false);
 
-  const popupRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const firedThresholds = useRef<Set<number>>(new Set());
-  const dragOffset = useRef<Pos>({ x: 0, y: 0 });
 
-  // For the "only one video at a time" coordinator (see effect below).
-  const instanceId = useRef(Math.random().toString(36).slice(2));
-  const openRef = useRef(false);
-  const closeRef = useRef<() => void>(() => {});
+  const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const meta =
+    durationSeconds != null ? `Video · ${formatDuration(durationSeconds)}` : "Video";
 
-  function fire(type: EventType, meta?: Record<string, unknown>) {
-    if (tracking) postEvent(tracking.slug, type, tracking.contentId, meta);
+  function fire(type: EventType, m?: Record<string, unknown>) {
+    if (tracking) postEvent(tracking.slug, type, tracking.contentId, m);
   }
   function stopPoll() {
     if (pollRef.current) {
@@ -159,33 +127,12 @@ export function VideoPlayer({
     }, 1000);
   }
 
-  function openPopup() {
-    const b = boxFor(false);
-    setBox(b);
-    setPos({
-      x: Math.max(MARGIN, (window.innerWidth - b.w) / 2),
-      y: Math.max(MARGIN, (window.innerHeight - b.h) / 2),
-    });
+  function openModal() {
     setUseFallback(false);
-    setDocked(false);
     firedThresholds.current = new Set();
     setOpen(true);
-    // Tell any other open player to close — only one video plays at a time.
-    window.dispatchEvent(
-      new CustomEvent("sr-video-open", { detail: instanceId.current }),
-    );
   }
-  // Bring a docked PiP back to the centered, modal-like state (player keeps playing).
-  function recenter() {
-    const b = boxFor(false);
-    setBox(b);
-    setDocked(false);
-    setPos({
-      x: Math.max(MARGIN, (window.innerWidth - b.w) / 2),
-      y: Math.max(MARGIN, (window.innerHeight - b.h) / 2),
-    });
-  }
-  function closePopup() {
+  function closeModal() {
     stopPoll();
     try {
       playerRef.current?.destroy?.();
@@ -196,21 +143,7 @@ export function VideoPlayer({
     setOpen(false);
   }
 
-  // Keep refs current for the cross-instance coordinator (listener is mount-only).
-  openRef.current = open;
-  closeRef.current = closePopup;
-
-  // Only one video at a time: when another player opens, close this one.
-  useEffect(() => {
-    function onOtherOpen(e: Event) {
-      const id = (e as CustomEvent<string>).detail;
-      if (id !== instanceId.current && openRef.current) closeRef.current();
-    }
-    window.addEventListener("sr-video-open", onOtherOpen);
-    return () => window.removeEventListener("sr-video-open", onOtherOpen);
-  }, []);
-
-  // Build the tracked player when the popup is open.
+  // Build the tracked player when the modal opens.
   useEffect(() => {
     if (!open || !tracking || useFallback) return;
     let cancelled = false;
@@ -251,111 +184,80 @@ export function VideoPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, tracking, useFallback, videoId]);
 
-  // Drag handling (pointer on the header). Snaps to a corner + shrinks to PiP on release.
-  const onPointerMove = useCallback(
-    (e: PointerEvent) => {
-      setPos((prev) => {
-        if (!prev) return prev;
-        return {
-          x: clamp(e.clientX - dragOffset.current.x, MARGIN, window.innerWidth - box.w - MARGIN),
-          y: clamp(e.clientY - dragOffset.current.y, MARGIN, window.innerHeight - box.h - MARGIN),
-        };
-      });
-    },
-    [box.w, box.h],
-  );
-
-  const endDrag = useCallback(() => {
-    setDragging(false);
-    setDocked(true); // dragging it out of center makes it a persistent PiP
-    const b = boxFor(true);
-    setBox(b);
-    setPos((prev) => (prev ? nearestCorner(prev, b) : prev));
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", endDrag);
-  }, [onPointerMove]);
-
-  function startDrag(e: React.PointerEvent) {
-    if (!pos) return;
-    dragOffset.current = { x: e.clientX - pos.x, y: e.clientY - pos.y };
-    setDragging(true);
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", endDrag);
-  }
-
+  // Escape to close + lock body scroll while the modal is open.
   useEffect(() => {
-    return () => {
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", endDrag);
-      stopPoll();
-    };
-  }, [onPointerMove, endDrag]);
-
-  // While centered (not docked), dismiss on outside click / Escape — like a modal.
-  // There's no blocking backdrop, so the underlying click still fires (e.g. "Back
-  // to all resources" both closes the player and navigates). Docked PiP ignores this.
-  useEffect(() => {
-    if (!open || docked) return;
-    const onDown = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-        closePopup();
-      }
-    };
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") closePopup();
+      if (e.key === "Escape") closeModal();
     };
-    document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     return () => {
-      document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, docked]);
+  }, [open]);
 
-  const popup =
-    open && pos ? (
+  useEffect(() => () => stopPoll(), []);
+
+  const modal = open ? (
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-[#14161c]/95 backdrop-blur-sm"
+      onClick={closeModal}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+    >
+      {/* Header */}
       <div
-        ref={popupRef}
-        className="fixed z-50 overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl"
-        style={{
-          left: pos.x,
-          top: pos.y,
-          width: box.w,
-          transition: dragging
-            ? "none"
-            : "left 0.2s ease, top 0.2s ease, width 0.2s ease",
-        }}
+        className="mx-auto flex w-full max-w-4xl items-start gap-3 px-4 pt-6 sm:px-6"
+        onClick={(e) => e.stopPropagation()}
       >
-        <div
-          onPointerDown={startDrag}
-          className="flex cursor-grab touch-none items-center justify-between gap-2 bg-slate-800 px-3 py-2 text-white active:cursor-grabbing"
+        <button
+          type="button"
+          onClick={closeModal}
+          aria-label="Back"
+          className="-ml-1 mt-0.5 shrink-0 rounded-full p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
         >
-          <span className="truncate text-sm font-medium">{title}</span>
-          <div className="flex items-center gap-1">
-            {docked && (
-              <button
-                type="button"
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={recenter}
-                aria-label="Recenter player"
-                className="rounded px-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
-              >
-                ⤢
-              </button>
-            )}
-            <button
-              type="button"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={closePopup}
-              aria-label="Close player"
-              className="rounded px-1.5 text-slate-300 hover:bg-white/10 hover:text-white"
-            >
-              ✕
-            </button>
-          </div>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="h-5 w-5"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-lg font-semibold text-white sm:text-xl">
+            {title}
+          </h2>
+          <p className="mt-1 flex items-center gap-1.5 text-sm text-slate-400">
+            <YouTubeGlyph />
+            YouTube
+          </p>
         </div>
-        <div className="aspect-video w-full bg-black">
+        <a
+          href={watchUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-white transition hover:bg-white/20"
+        >
+          YouTube
+        </a>
+      </div>
+
+      {/* Player */}
+      <div
+        className="mx-auto mt-4 w-full max-w-4xl px-4 sm:px-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl">
           {tracking && !useFallback ? (
             <div ref={containerRef} className="h-full w-full" />
           ) : (
@@ -369,34 +271,61 @@ export function VideoPlayer({
           )}
         </div>
       </div>
-    ) : null;
+
+      {/* Below the video: real CRM detail (in place of Google's "Related topics"). */}
+      <div
+        className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-xs uppercase tracking-wide text-slate-500">{meta}</p>
+        {description ? (
+          <p className="mt-2 text-sm leading-relaxed text-slate-300">
+            {description}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  ) : null;
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openPopup}
-        className="group relative block aspect-video w-full overflow-hidden bg-slate-900"
-        aria-label={`Play ${title}`}
-      >
-        {thumbnail ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={thumbnail}
-            alt=""
-            className="h-full w-full object-cover opacity-80 transition group-hover:opacity-100"
-          />
-        ) : null}
-        <span className="absolute inset-0 flex items-center justify-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 pl-1 text-xl text-brand-700 shadow">
-            ▶
+      {variant === "link" ? (
+        <button
+          type="button"
+          onClick={openModal}
+          aria-label={`Preview ${title}`}
+          className="inline-flex items-center gap-1 text-xs font-medium text-brand-700 transition hover:text-brand-800"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          Preview
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={openModal}
+          className="group relative block aspect-video w-full overflow-hidden bg-slate-900"
+          aria-label={`Play ${title}`}
+        >
+          {thumbnail ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumbnail}
+              alt=""
+              className="h-full w-full object-cover opacity-80 transition group-hover:opacity-100"
+            />
+          ) : null}
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 pl-1 text-xl text-brand-700 shadow">
+              ▶
+            </span>
           </span>
-        </span>
-      </button>
+        </button>
+      )}
 
-      {/* Portal to <body> so the player survives in-page navigation and keeps playing. */}
-      {popup && typeof document !== "undefined"
-        ? createPortal(popup, document.body)
+      {modal && typeof document !== "undefined"
+        ? createPortal(modal, document.body)
         : null}
     </>
   );

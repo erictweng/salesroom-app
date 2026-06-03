@@ -5,16 +5,18 @@
  */
 
 const FOLLOWUPS: Record<string, string> = {
-  Pricing:
-    "They're digging into pricing — send a tailored quote and offer to walk through it.",
-  Security:
-    "Security is top of mind — share your SOC 2 report or offer a security review.",
-  "Product Demo":
+  "Custom Proposal":
+    "They're digging into pricing and scope — send a tailored quote and offer to walk through it.",
+  "Secureframe Overview & Our Team":
+    "They're getting to know Secureframe — offer an intro call with the team.",
+  "Product Demos":
     "They're watching demos — offer a live, tailored walkthrough with their team.",
-  "Customer Story":
+  "Getting Started with Your Trial":
+    "They're onboarding — check in to help them get set up and unblock the trial.",
+  "Case Studies":
     "They're reading customer stories — connect them with a reference customer.",
-  "Technical Overview":
-    "They're deep in technical evaluation — loop in a solutions engineer.",
+  "Integration Documentation":
+    "They're deep in technical setup — loop in a solutions engineer.",
 };
 
 const DEFAULT_FOLLOWUP =

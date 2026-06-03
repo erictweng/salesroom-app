@@ -24,6 +24,7 @@ import {
   resetSectionLayoutAction,
 } from "@/server/actions";
 import { DEFAULT_SECTION_ORDER } from "@/lib/sections";
+import { sectionDomId } from "@/lib/notes";
 
 export interface SectionDescriptor {
   id: string;
@@ -41,7 +42,12 @@ function SortableItem({ section }: { section: SectionDescriptor }) {
     zIndex: isDragging ? 10 : undefined,
   };
   return (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      id={sectionDomId(section.id)}
+      className="scroll-mt-24 rounded-xl transition-shadow"
+    >
       <CollapsibleSection
         title={section.title}
         storageKey={section.storageKey}

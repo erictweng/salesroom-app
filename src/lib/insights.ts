@@ -24,11 +24,36 @@ export interface Insights {
   topStakeholder: { name: string; email: string | null; eventCount: number } | null;
   mostViewedResource: { contentId: string; title: string; eventCount: number } | null;
   suggestedFollowUp: string | null;
+  // Analytics breakdowns:
+  eventsByType: Record<string, number>;
+  topStakeholders: { name: string; eventCount: number }[];
+  topResources: { contentId: string; title: string; eventCount: number }[];
+  /** Per-day event counts over the trend window (ascending, zero-filled). */
+  eventsByDay: { date: string; count: number }[];
+  /** Content-event counts grouped by category (desc), for the category mix. */
+  eventsByCategory: { category: string; count: number }[];
+  /** Per-person engagement totals (desc), for the per-stakeholder bars. */
+  peopleEngagement: { name: string; eventCount: number }[];
 }
 
 export interface ComputeInsightsOptions {
   /** Actor roles to exclude from engagement analysis (e.g. ["rep"] previews). */
   excludeRoles?: string[];
+  /**
+   * "Now" as an ISO string, used only to anchor the trend window's last day.
+   * Defaults to the wall clock; pass a fixed value for deterministic tests.
+   */
+  now?: string;
+}
+
+/** How many days the activity trend spans (matches event retention). */
+export const TREND_DAYS = 7;
+
+/** Add `delta` days to a YYYY-MM-DD date (UTC), returning YYYY-MM-DD. */
+function shiftDay(day: string, delta: number): string {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
 }
 
 /** Event types that reference a specific content item (count toward "most viewed"). */
@@ -47,6 +72,12 @@ const EMPTY: Insights = {
   topStakeholder: null,
   mostViewedResource: null,
   suggestedFollowUp: null,
+  eventsByType: {},
+  topStakeholders: [],
+  topResources: [],
+  eventsByDay: [],
+  eventsByCategory: [],
+  peopleEngagement: [],
 };
 
 export function computeInsights(
@@ -83,12 +114,22 @@ export function computeInsights(
       });
     }
   }
-  const top = [...actors.values()].sort(
+  const actorsSorted = [...actors.values()].sort(
     (x, y) =>
       y.count - x.count ||
       y.last.localeCompare(x.last) ||
       x.name.localeCompare(y.name),
-  )[0];
+  );
+  const top = actorsSorted[0];
+  const topStakeholders = actorsSorted.slice(0, 3).map((a) => ({
+    name: a.name,
+    eventCount: a.count,
+  }));
+  // A longer list for the per-person engagement bars.
+  const peopleEngagement = actorsSorted.slice(0, 8).map((a) => ({
+    name: a.name,
+    eventCount: a.count,
+  }));
 
   // Aggregate content-referencing events by content id.
   const contents = new Map<string, { count: number; last: string }>();
@@ -102,19 +143,24 @@ export function computeInsights(
       contents.set(e.content_id, { count: 1, last: e.created_at });
     }
   }
+  const contentsSorted = [...contents.entries()].sort(
+    ([idX, x], [idY, y]) =>
+      y.count - x.count ||
+      y.last.localeCompare(x.last) ||
+      (contentMeta[idX]?.title ?? idX).localeCompare(
+        contentMeta[idY]?.title ?? idY,
+      ),
+  );
+  const topResources = contentsSorted.slice(0, 3).map(([id, agg]) => ({
+    contentId: id,
+    title: contentMeta[id]?.title ?? id,
+    eventCount: agg.count,
+  }));
 
   let mostViewedResource: Insights["mostViewedResource"] = null;
   let suggestedFollowUp: string | null = null;
-  if (contents.size > 0) {
-    const ranked = [...contents.entries()].sort(
-      ([idX, x], [idY, y]) =>
-        y.count - x.count ||
-        y.last.localeCompare(x.last) ||
-        (contentMeta[idX]?.title ?? idX).localeCompare(
-          contentMeta[idY]?.title ?? idY,
-        ),
-    )[0];
-    const [contentId, agg] = ranked;
+  if (contentsSorted.length > 0) {
+    const [contentId, agg] = contentsSorted[0];
     const meta = contentMeta[contentId];
     mostViewedResource = {
       contentId,
@@ -123,6 +169,36 @@ export function computeInsights(
     };
     suggestedFollowUp = followUpForCategory(meta?.category);
   }
+
+  // Event-type breakdown.
+  const eventsByType: Record<string, number> = {};
+  for (const e of rows) {
+    eventsByType[e.type] = (eventsByType[e.type] ?? 0) + 1;
+  }
+
+  // Per-day trend: zero-filled window of TREND_DAYS ending on "now"'s UTC day.
+  const dayCounts = new Map<string, number>();
+  for (const e of rows) {
+    const day = e.created_at.slice(0, 10);
+    dayCounts.set(day, (dayCounts.get(day) ?? 0) + 1);
+  }
+  const endDay = (opts.now ?? new Date().toISOString()).slice(0, 10);
+  const eventsByDay: { date: string; count: number }[] = [];
+  for (let i = TREND_DAYS - 1; i >= 0; i--) {
+    const date = shiftDay(endDay, -i);
+    eventsByDay.push({ date, count: dayCounts.get(date) ?? 0 });
+  }
+
+  // Category mix: content-referencing events grouped by their content's category.
+  const categoryCounts = new Map<string, number>();
+  for (const e of rows) {
+    if (!e.content_id || !CONTENT_EVENT_TYPES.has(e.type)) continue;
+    const category = contentMeta[e.content_id]?.category ?? "Uncategorized";
+    categoryCounts.set(category, (categoryCounts.get(category) ?? 0) + 1);
+  }
+  const eventsByCategory = [...categoryCounts.entries()]
+    .sort(([catX, x], [catY, y]) => y - x || catX.localeCompare(catY))
+    .map(([category, count]) => ({ category, count }));
 
   return {
     totalEvents: rows.length,
@@ -135,5 +211,11 @@ export function computeInsights(
     },
     mostViewedResource,
     suggestedFollowUp,
+    eventsByType,
+    topStakeholders,
+    topResources,
+    eventsByDay,
+    eventsByCategory,
+    peopleEngagement,
   };
 }

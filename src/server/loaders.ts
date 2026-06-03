@@ -12,9 +12,11 @@ import {
 import {
   getRoomByAccount,
   getRoomBySlug,
+  listNotes,
   listRoomResources,
   listVisibleRoomResources,
 } from "@/lib/repo";
+import { categoryForContent } from "@/lib/categories";
 import type {
   Account,
   Content,
@@ -22,6 +24,7 @@ import type {
   Enrichment,
   Opportunity,
   Room,
+  RoomNote,
   RoomResource,
 } from "@/lib/types";
 
@@ -65,7 +68,13 @@ function withContent(
 ): ResourceWithContent | null {
   const content = byId.get(r.content_id);
   if (!content) return null;
-  return { ...r, content, effectiveCategory: r.category ?? content.category };
+  // Per-room override wins; otherwise the content's dedicated buyer-facing
+  // category (mapped from the CRM item), falling back to the CRM's own category.
+  return {
+    ...r,
+    content,
+    effectiveCategory: r.category ?? categoryForContent(content.id, content.category),
+  };
 }
 
 export interface RoomData {
@@ -75,6 +84,7 @@ export interface RoomData {
   contacts: Contact[];
   opportunities: Opportunity[];
   resources: ResourceWithContent[];
+  notes: RoomNote[]; // rep-only; never loaded for the buyer view
 }
 
 /**
@@ -103,7 +113,15 @@ export async function loadRoomData(
     .map((r) => withContent(r, byId))
     .filter((r): r is ResourceWithContent => r !== null);
 
-  return { room, account, enrichment, contacts, opportunities, resources };
+  return {
+    room,
+    account,
+    enrichment,
+    contacts,
+    opportunities,
+    resources,
+    notes: listNotes(room.id),
+  };
 }
 
 /**

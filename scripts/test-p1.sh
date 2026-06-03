@@ -61,24 +61,24 @@ page=$(curl -s -b "$JAR" "$APP/seller/rooms/$slug")
 contains "Module A heading" "Account Snapshot" "$page"
 contains "Module B heading" "Stakeholder Map" "$page"
 contains "Module C heading" "Content Hub" "$page"
-contains "Module E heading" "Activity &" "$page"
+contains "Activity & Engagement panel" "Activity & Engagement" "$page"
 contains "Champion highlighted" "Champion" "$page"
 contains "CRM score labeled" "CRM score" "$page"
-contains "Module D panel (Deal & Engagement)" "Deal &" "$page"
+contains "Deal Overview panel (separate from engagement)" "Deal Overview" "$page"
 contains "deal stage stepper" "Negotiation" "$page"
-contains "Module F panel (Internal Notes)" "Internal Notes" "$page"
+contains "Internal notes drawer toggle" "Internal notes" "$page"
 
-echo "== custom panel order persists + reflects in SSR =="
-node -e 'const D=require("better-sqlite3");const db=new D("./data/salesroom.db");db.prepare("UPDATE rooms SET section_order=? WHERE slug=?").run(JSON.stringify(["engagement","content","snapshot","stakeholders"]), process.argv[1]);' "$slug"
-reordered=$(curl -s -b "$JAR" "$APP/seller/rooms/$slug")
-ord=$(python3 - "$reordered" <<'PY'
+echo "== widget grid renders the fixed layout (Deal → Activity → Content) =="
+# Reorder is shelved; the layout is fixed: context pair (Snapshot/Stakeholders),
+# then Deal Overview, Activity & Engagement, and Content Hub stacked below.
+ord=$(python3 - "$page" <<'PY'
 import sys
 h = sys.argv[1]
-ia, ic = h.find("Activity &"), h.find("Content Hub")
-print("OK" if 0 <= ia < ic else "BAD")
+idd, ia, ic = h.find("Deal Overview"), h.find("Activity &"), h.find("Content Hub")
+print("OK" if 0 <= idd < ia < ic else "BAD")
 PY
 )
-check "panels render in saved order (Engagement before Content)" "OK" "$ord"
+check "panels render in the fixed grid order (Deal < Activity < Content)" "OK" "$ord"
 
 echo "== buyer is blocked from seller routes =="
 curl -s -c "$JARB" -o /dev/null -X POST "$APP/api/auth/login" \

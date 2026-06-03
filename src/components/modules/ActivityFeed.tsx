@@ -65,7 +65,7 @@ export function ActivityFeed({
           hint="When a buyer opens this room and views content, their actions appear here, attributed to them."
         />
       ) : (
-        <ul className="space-y-2">
+        <ul className="max-h-96 space-y-2 overflow-y-auto pr-1">
           {events.map((e) => (
             <li
               key={e.id}

@@ -7,27 +7,27 @@ import { RoomControls } from "@/components/seller/RoomControls";
 import { FeedAutoRefresh } from "@/components/seller/FeedAutoRefresh";
 import { EngagementSummary } from "@/components/seller/EngagementSummary";
 import { ContentManager } from "@/components/seller/ContentManager";
-import {
-  SortableSections,
-  type SectionDescriptor,
-} from "@/components/seller/SortableSections";
-import { orderKeys, parseSectionOrder } from "@/lib/sections";
 import { CollapsibleSection } from "@/components/ui/CollapsibleSection";
+import { sectionDomId } from "@/lib/notes";
 import { DealOverview } from "@/components/modules/DealOverview";
 import { AccountSnapshot } from "@/components/modules/AccountSnapshot";
 import { StakeholderMap } from "@/components/modules/StakeholderMap";
 import { InsightsPanel } from "@/components/modules/InsightsPanel";
+import { AnalyticsSummary } from "@/components/modules/AnalyticsSummary";
 import { ActivityFeed } from "@/components/modules/ActivityFeed";
-import { InternalNotes } from "@/components/seller/InternalNotes";
+import { NotesDrawer } from "@/components/seller/NotesDrawer";
 
 export const dynamic = "force-dynamic";
 
 /**
- * The room builder, build-first: the rep's working surface (content curation) is
- * primary, with a glanceable engagement strip up top. Account context,
- * stakeholders, and the engagement detail live in collapsible sections so the
- * page stays focused. Modules are pure components fed by a single parallel load,
- * so the same set can power the buyer view.
+ * The room builder, build-first, laid out as a widget grid: Account Snapshot and
+ * Stakeholder Map sit side by side up top (compact context, using the horizontal
+ * space), with the detail-dense panels — Deal Overview, then Activity &
+ * Engagement, then the Content Hub — stacked full-width below. A glanceable
+ * engagement KPI strip stays at the top. Panels are collapsible (state per
+ * browser). Drag-to-reorder is intentionally shelved for now; the layout is
+ * fixed. Modules are pure components fed by a single parallel load, so the same
+ * set can power the buyer view.
  */
 export default async function RoomBuilderPage({
   params,
@@ -51,63 +51,6 @@ export default async function RoomBuilderPage({
     contentMeta,
     { excludeRoles: ["rep"] },
   );
-
-  // The reorderable panels. Built here (server) and ordered by the room's saved
-  // layout, so the chosen order server-renders on first paint.
-  const sectionMap: Record<string, SectionDescriptor> = {
-    content: {
-      id: "content",
-      title: "Content Hub",
-      storageKey: "content",
-      content: <ContentManager slug={data.room.slug} resources={data.resources} />,
-    },
-    snapshot: {
-      id: "snapshot",
-      title: "Account Snapshot",
-      storageKey: "snapshot",
-      content: <AccountSnapshot account={data.account} enrichment={data.enrichment} />,
-    },
-    stakeholders: {
-      id: "stakeholders",
-      title: "Stakeholder Map",
-      storageKey: "stakeholders",
-      content: <StakeholderMap contacts={data.contacts} />,
-    },
-    engagement: {
-      id: "engagement",
-      title: "Deal & Engagement",
-      storageKey: "engagement",
-      content: (
-        <div className="space-y-4">
-          {/* Deal status (CRM) stays visible at the top... */}
-          <DealOverview opportunities={data.opportunities} />
-          {/* ...with the live activity in its own nested collapse below. */}
-          <CollapsibleSection
-            title="Activity & Engagement"
-            storageKey="activity"
-            nested
-          >
-            <InsightsPanel insights={insights} />
-            <ActivityFeed events={events} contentTitles={contentTitles} />
-          </CollapsibleSection>
-        </div>
-      ),
-    },
-    notes: {
-      id: "notes",
-      title: "Internal Notes",
-      storageKey: "notes",
-      content: (
-        <InternalNotes
-          slug={data.room.slug}
-          initial={data.room.internal_notes ?? ""}
-        />
-      ),
-    },
-  };
-  const orderedSections = orderKeys(parseSectionOrder(data.room.section_order))
-    .map((k) => sectionMap[k])
-    .filter(Boolean) as SectionDescriptor[];
 
   return (
     <div className="space-y-5">
@@ -134,7 +77,66 @@ export default async function RoomBuilderPage({
 
       <EngagementSummary insights={insights} status={data.room.status} />
 
-      <SortableSections slug={data.room.slug} sections={orderedSections} />
+      {/* Row 1: compact context, side by side and equal height on wide screens
+          (default grid stretch). A collapsed panel pins to the top via the
+          CollapsibleSection's self-start so it won't stretch. */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <CollapsibleSection
+          title="Account Snapshot"
+          storageKey="snapshot"
+          id={sectionDomId("snapshot")}
+          className="scroll-mt-24"
+        >
+          <AccountSnapshot
+            account={data.account}
+            enrichment={data.enrichment}
+            opportunities={data.opportunities}
+          />
+        </CollapsibleSection>
+        <CollapsibleSection
+          title="Stakeholder Map"
+          storageKey="stakeholders"
+          id={sectionDomId("stakeholders")}
+          className="scroll-mt-24"
+        >
+          <StakeholderMap contacts={data.contacts} />
+        </CollapsibleSection>
+      </div>
+
+      {/* Detail-dense panels, stacked full-width below. */}
+      <CollapsibleSection
+        title="Deal Overview"
+        storageKey="deal"
+        id={sectionDomId("deal")}
+        className="scroll-mt-24"
+      >
+        <DealOverview opportunities={data.opportunities} />
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Activity & Engagement"
+        storageKey="engagement"
+        id={sectionDomId("engagement")}
+        className="scroll-mt-24"
+      >
+        <div className="space-y-4">
+          <InsightsPanel insights={insights} />
+          <AnalyticsSummary insights={insights} />
+          <ActivityFeed events={events} contentTitles={contentTitles} />
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Content Hub"
+        storageKey="content"
+        id={sectionDomId("content")}
+        className="scroll-mt-24"
+      >
+        <ContentManager slug={data.room.slug} resources={data.resources} />
+      </CollapsibleSection>
+
+      {/* Floating notes button (bottom-right) + slide-out pane. Rep-only. */}
+      <NotesDrawer slug={data.room.slug} notes={data.notes} />
     </div>
   );
 }

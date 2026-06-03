@@ -1,6 +1,22 @@
 import { Badge } from "@/components/ui/Badge";
-import type { Account, Enrichment } from "@/lib/types";
+import { formatDate } from "@/lib/format";
+import { pickPrimaryOpportunity, stageIndex, STAGE_SEQUENCE } from "@/lib/deals";
+import type { Account, Enrichment, Opportunity } from "@/lib/types";
 import type { ReactNode } from "react";
+
+/** Compact currency, e.g. "$120,000" (no cents). Falls back to "—". */
+function money(amount?: number | null, currency?: string | null): string {
+  if (amount == null) return "—";
+  try {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency || "USD",
+      maximumFractionDigits: 0,
+    }).format(amount);
+  } catch {
+    return `$${amount.toLocaleString()}`;
+  }
+}
 
 /** Show "—" for any missing/blank scalar so the module never renders gaps. */
 function val(v: unknown): ReactNode {
@@ -43,16 +59,48 @@ function Chips({ items }: { items?: string[] | null }) {
 export function AccountSnapshot({
   account,
   enrichment,
+  opportunities,
 }: {
   account: Account;
   enrichment: Enrichment | null;
+  opportunities?: Opportunity[];
 }) {
+  const primary = pickPrimaryOpportunity(opportunities);
+  const idx = primary ? stageIndex(primary.stage) : -1;
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-4">
         <p className="text-sm text-slate-500">{val(account.domain)}</p>
         <Badge tone="green">ICP fit {account.icp_fit_score ?? "—"}</Badge>
       </div>
+
+      {/* One-line deal cue: where the deal stands at a glance. Full pipeline lives
+          in the Deal Overview panel. */}
+      {primary && (
+        <div className="mb-4 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-brand-50 px-3 py-2 text-sm">
+          <span className="font-medium text-brand-800">
+            Deal: {val(primary.stage)}
+          </span>
+          {idx >= 0 && (
+            <span className="text-xs text-brand-700/70">
+              (stage {idx + 1} of {STAGE_SEQUENCE.length})
+            </span>
+          )}
+          <span className="text-slate-300">·</span>
+          <span className="text-slate-700">
+            {money(primary.amount, primary.currency)}
+          </span>
+          {primary.close_date && (
+            <>
+              <span className="text-slate-300">·</span>
+              <span className="text-slate-700">
+                closes {formatDate(primary.close_date)}
+              </span>
+            </>
+          )}
+        </div>
+      )}
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
         <Field label="Industry">{val(account.industry)}</Field>

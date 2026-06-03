@@ -51,6 +51,8 @@ export function ResourceCard({
           videoId={videoId}
           title={content.title}
           thumbnail={content.thumbnail_url}
+          description={content.description}
+          durationSeconds={content.duration_seconds}
           tracking={
             tracking
               ? {

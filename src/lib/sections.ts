@@ -8,23 +8,25 @@ export const SECTION_KEYS = [
   "content",
   "snapshot",
   "stakeholders",
-  "engagement", // "Deal & Engagement" panel (deal status + activity)
-  "notes", // rep-only internal notes
+  "deal", // "Deal Overview" panel (CRM pipeline facts)
+  "engagement", // "Activity & Engagement" panel (live buyer events)
 ] as const;
 
 export type SectionKey = (typeof SECTION_KEYS)[number];
 
 /**
- * Default panel layout: account context and stakeholders first, then the content
- * the rep curates, with the engagement detail last. Reps can drag to a different
+ * Default panel layout: account context and stakeholders first, then the deal,
+ * the content the rep curates, with live engagement last. Deal Overview and
+ * Activity & Engagement are separate panels — they answer two different
+ * questions (pipeline state vs buyer behavior). Reps can drag to a different
  * order per room; this is just the starting point.
  */
 export const DEFAULT_SECTION_ORDER: SectionKey[] = [
   "snapshot",
   "stakeholders",
+  "deal",
   "content",
   "engagement",
-  "notes",
 ];
 
 const KNOWN = new Set<string>(SECTION_KEYS);

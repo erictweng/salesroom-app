@@ -36,3 +36,14 @@ body {
 .buyer-topbar {
   background-image: linear-gradient(100deg, #03241b 0%, #064e3b 55%, #0a7f57 100%);
 }
+
+/* Gentle "pop" when a company is favorited (gold star). */
+@keyframes sr-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.4); }
+  70% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+.animate-sr-pop {
+  animation: sr-pop 320ms ease-out;
+}

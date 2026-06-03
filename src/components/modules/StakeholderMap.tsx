@@ -190,7 +190,7 @@ export function StakeholderMap({ contacts }: { contacts: Contact[] }) {
           }
         />
       ) : (
-        <ul className="divide-y divide-slate-100">
+        <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
           {rows.map((c) => {
             const isChampion = c.role === "Champion";
             return (

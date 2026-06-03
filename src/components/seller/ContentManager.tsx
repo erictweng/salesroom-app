@@ -32,6 +32,8 @@ import {
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { contentTypeLabel } from "@/lib/format";
 import { CATEGORY_ORDER, orderCategories } from "@/lib/categories";
+import { parseYouTubeId } from "@/lib/youtube";
+import { VideoPlayer } from "@/components/content/VideoPlayer";
 import type { ResourceWithContent } from "@/server/loaders";
 
 const TYPE_TONE: Record<string, BadgeTone> = {
@@ -46,6 +48,10 @@ interface Item {
   title: string;
   type: string;
   hidden: boolean;
+  videoId: string | null;
+  thumbnail: string | null;
+  description: string | null;
+  durationSeconds: number | null;
 }
 type Board = Record<string, Item[]>;
 
@@ -58,6 +64,10 @@ function buildBoard(resources: ResourceWithContent[], columns: string[]): Board 
       title: r.content.title,
       type: r.content.type,
       hidden: r.hidden === 1,
+      videoId: r.content.type === "video" ? parseYouTubeId(r.content.url) : null,
+      thumbnail: r.content.thumbnail_url,
+      description: r.content.description,
+      durationSeconds: r.content.duration_seconds,
     });
   }
   return board;
@@ -353,11 +363,28 @@ function CardFace({
         )}
       </div>
       <p className="mt-1.5 line-clamp-2 text-sm text-slate-800">{item.title}</p>
-      {item.hidden && (
-        <span className="mt-1 inline-block text-[10px] uppercase tracking-wide text-slate-400">
-          Hidden from buyer
-        </span>
-      )}
+      <div className="mt-1 flex items-center justify-between">
+        {item.hidden ? (
+          <span className="text-[10px] uppercase tracking-wide text-slate-400">
+            Hidden from buyer
+          </span>
+        ) : (
+          <span />
+        )}
+        {/* Inline preview so a rep can watch without switching to the buyer view.
+            Untracked (no events) — it's the rep previewing, not buyer engagement.
+            Hidden in the drag overlay to avoid a live player while dragging. */}
+        {!dragging && item.videoId && (
+          <VideoPlayer
+            variant="link"
+            videoId={item.videoId}
+            title={item.title}
+            thumbnail={item.thumbnail}
+            description={item.description}
+            durationSeconds={item.durationSeconds}
+          />
+        )}
+      </div>
     </div>
   );
 }

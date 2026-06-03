@@ -12,12 +12,40 @@ import type { ResourceWithContent } from "@/server/loaders";
 const OUT_OF_SCOPE_TABS = ["Security & Trust", "Quotes & Contract", "Our partners"];
 
 const CATEGORY_BLURB: Record<string, string> = {
-  "Product Demo": "Walkthroughs tailored to your team.",
-  "Customer Story": "How companies like yours got there.",
-  "Technical Overview": "Architecture and integration details.",
-  Pricing: "Proposal, pricing, and scope.",
-  Security: "Security, trust, and compliance.",
+  "Custom Proposal": "Pricing, timeline, and scope tailored to your team.",
+  "Secureframe Overview & Our Team":
+    "Meet the team behind your compliance journey and see what Secureframe can do.",
+  "Product Demos": "A walkthrough of the features that matter most to your team.",
+  "Getting Started with Your Trial":
+    "A quick guide to getting the most out of your Secureframe trial.",
+  "Case Studies": "How companies like yours got compliant with Secureframe.",
+  "Integration Documentation":
+    "Technical setup guides for AWS, GitHub, HR systems, and more.",
 };
+
+/** Per-category logo: an icon + tinted tile, matching the buyer-page design. */
+const CATEGORY_STYLE: Record<
+  string,
+  { tile: string; icon: React.ReactNode }
+> = {
+  "Custom Proposal": { tile: "bg-blue-50 text-blue-600", icon: <DocumentIcon /> },
+  "Secureframe Overview & Our Team": {
+    tile: "bg-violet-50 text-violet-600",
+    icon: <TeamIcon />,
+  },
+  "Product Demos": { tile: "bg-emerald-50 text-emerald-600", icon: <PlayIcon /> },
+  "Getting Started with Your Trial": {
+    tile: "bg-rose-50 text-rose-600",
+    icon: <GearIcon />,
+  },
+  "Case Studies": { tile: "bg-fuchsia-50 text-fuchsia-600", icon: <SearchIcon /> },
+  "Integration Documentation": {
+    tile: "bg-slate-100 text-slate-600",
+    icon: <BookIcon />,
+  },
+};
+
+const DEFAULT_STYLE = { tile: "bg-brand-50 text-brand-700", icon: <DocumentIcon /> };
 
 /**
  * The buyer's Resources experience: a category grid that drills into a per-
@@ -72,14 +100,17 @@ export function BuyerResources({
         <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {categories.map((cat) => {
             const items = groups.get(cat)!;
+            const style = CATEGORY_STYLE[cat] ?? DEFAULT_STYLE;
             return (
               <button
                 key={cat}
                 onClick={() => setSelected(cat)}
                 className="rounded-xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-brand-400 hover:shadow"
               >
-                <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-sm font-semibold text-brand-700">
-                  {cat[0]}
+                <div
+                  className={`mb-3 flex h-9 w-9 items-center justify-center rounded-lg ${style.tile}`}
+                >
+                  {style.icon}
                 </div>
                 <h3 className="font-semibold text-slate-900">{cat}</h3>
                 <p className="mt-1 text-sm text-slate-500">
@@ -132,6 +163,8 @@ function ResourceRow({ slug, content }: { slug: string; content: Content }) {
             videoId={videoId}
             title={content.title}
             thumbnail={content.thumbnail_url}
+            description={content.description}
+            durationSeconds={content.duration_seconds}
             tracking={{
               slug,
               contentId: content.id,
@@ -186,5 +219,73 @@ function ResourceRow({ slug, content }: { slug: string; content: Content }) {
         )}
       </div>
     </div>
+  );
+}
+
+/* ----------------------------- category icons ------------------------- */
+
+const ICON_PROPS = {
+  viewBox: "0 0 24 24",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.8,
+  strokeLinecap: "round" as const,
+  strokeLinejoin: "round" as const,
+  className: "h-5 w-5",
+  "aria-hidden": true,
+};
+
+function DocumentIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+      <path d="M14 3v5h5M9 13h6M9 17h6" />
+    </svg>
+  );
+}
+
+function TeamIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M16 19v-2a3 3 0 0 0-3-3H5a3 3 0 0 0-3 3v2" />
+      <circle cx="9" cy="8" r="3" />
+      <path d="M22 19v-2a3 3 0 0 0-2.2-2.9M16 5.1a3 3 0 0 1 0 5.8" />
+    </svg>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M10 9l5 3-5 3z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function GearIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+    </svg>
+  );
+}
+
+function SearchIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function BookIcon() {
+  return (
+    <svg {...ICON_PROPS}>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </svg>
   );
 }
