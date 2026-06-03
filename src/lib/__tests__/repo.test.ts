@@ -17,6 +17,8 @@ const {
   setResourceOrder,
   setResourceCategory,
   setSectionOrder,
+  setHiddenCategories,
+  parseHiddenCategories,
   setInternalNotes,
   addNote,
   listNotes,
@@ -102,6 +104,16 @@ describe("room resource reorder + hide", () => {
     ).toEqual(["engagement", "content"]);
     setSectionOrder(room.id, null);
     expect(getRoomBySlug(room.slug)!.section_order).toBeNull();
+  });
+
+  it("saves and clears per-room hidden categories", () => {
+    setHiddenCategories(room.id, ["Pricing", "Case Studies"]);
+    expect(
+      parseHiddenCategories(getRoomBySlug(room.slug)!.hidden_categories),
+    ).toEqual(["Pricing", "Case Studies"]);
+    setHiddenCategories(room.id, []);
+    expect(getRoomBySlug(room.slug)!.hidden_categories).toBeNull();
+    expect(parseHiddenCategories(null)).toEqual([]);
   });
 
   it("saves rep-only internal notes", () => {

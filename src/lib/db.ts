@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS rooms (
   status       TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published')),
   section_order TEXT,
   internal_notes TEXT,
+  hidden_categories TEXT,
   created_by   TEXT NOT NULL,
   created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
@@ -115,5 +116,10 @@ function migrate(db: Database.Database): void {
   // Rep-only internal notes (never shown to buyers).
   if (!hasColumn("rooms", "internal_notes")) {
     db.exec("ALTER TABLE rooms ADD COLUMN internal_notes TEXT");
+  }
+
+  // Per-room hidden categories (JSON array; their resources are hidden from buyers).
+  if (!hasColumn("rooms", "hidden_categories")) {
+    db.exec("ALTER TABLE rooms ADD COLUMN hidden_categories TEXT");
   }
 }

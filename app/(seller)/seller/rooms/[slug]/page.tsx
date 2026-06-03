@@ -132,7 +132,11 @@ export default async function RoomBuilderPage({
         id={sectionDomId("content")}
         className="scroll-mt-24"
       >
-        <ContentManager slug={data.room.slug} resources={data.resources} />
+        <ContentManager
+          slug={data.room.slug}
+          resources={data.resources}
+          hiddenCategories={data.hiddenCategories}
+        />
       </CollapsibleSection>
 
       {/* Floating notes button (bottom-right) + slide-out pane. Rep-only. */}

@@ -1,7 +1,9 @@
+import { ShareButton } from "./ShareButton";
+
 /**
  * Slim dark top bar above the buyer hero — the vendor (Secureframe) wordmark on
- * the left and a Share affordance on the right, matching the design screenshots.
- * Share is presentational (buyers receive a direct room link from their rep).
+ * the left and a working Share button on the right (native share sheet, or
+ * copy-the-room-link fallback), matching the design screenshots.
  */
 export function BuyerTopBar() {
   return (
@@ -10,7 +12,7 @@ export function BuyerTopBar() {
         <span className="text-base font-semibold lowercase tracking-tight">
           secureframe
         </span>
-        <span className="text-sm text-white/70">Share ↗</span>
+        <ShareButton />
       </div>
     </div>
   );

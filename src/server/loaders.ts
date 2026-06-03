@@ -15,6 +15,7 @@ import {
   listNotes,
   listRoomResources,
   listVisibleRoomResources,
+  parseHiddenCategories,
 } from "@/lib/repo";
 import { categoryForContent } from "@/lib/categories";
 import type {
@@ -85,6 +86,7 @@ export interface RoomData {
   opportunities: Opportunity[];
   resources: ResourceWithContent[];
   notes: RoomNote[]; // rep-only; never loaded for the buyer view
+  hiddenCategories: string[]; // categories the seller has hidden from the buyer
 }
 
 /**
@@ -121,6 +123,7 @@ export async function loadRoomData(
     opportunities,
     resources,
     notes: listNotes(room.id),
+    hiddenCategories: parseHiddenCategories(room.hidden_categories),
   };
 }
 
@@ -163,9 +166,13 @@ export async function loadBuyerRoom(
 
   const content = await listContent(token);
   const byId = new Map(content.map((c) => [c.id, c] as const));
+  const hidden = new Set(parseHiddenCategories(room.hidden_categories));
   const resources = listVisibleRoomResources(room.id)
     .map((r) => withContent(r, byId))
-    .filter((r): r is ResourceWithContent => r !== null);
+    .filter((r): r is ResourceWithContent => r !== null)
+    // Drop resources in hidden categories — the empty category then doesn't
+    // render on the buyer page.
+    .filter((r) => !hidden.has(r.effectiveCategory));
 
   return { status: "ok", account, resources, room };
 }

@@ -14,25 +14,32 @@ auto-refreshing feed with deterministic insight cards.
 
 Sign in as a rep at `/login`, then:
 
-- **Account picker** (`/seller`) lists every CRM account, with **name search** so
-  it scales. One click opens the account's room, creating it (idempotently) and
-  seeding it with the full content library if it doesn't exist yet.
+- **Account picker** (`/seller`) lists every CRM account, with **name search**, a
+  **filter popover** (industry, deal stage, minimum ICP fit, room status,
+  favorites-only), and a **grid/list** toggle. **Favorite** an account with the
+  gold star (or double-click the card — it gives a gentle pop); favorites persist
+  per browser and are filterable. One click opens the account's room, creating it
+  (idempotently) and seeding it with the full content library if it doesn't exist
+  yet.
 - **Room builder** (`/seller/rooms/[slug]`) is build-first: a compact
-  **engagement KPI strip** stays glanceable up top, and the five panels (Account
-  Snapshot, Stakeholder Map, Deal Overview, Content Hub, Activity & Engagement) are
-  **collapsible** (state per browser) and **drag-to-reorder** — the panel order is
-  saved **per room** (`rooms.section_order`, default order as fallback), with a
-  "Reset layout" control. Each stakeholder is **clickable → a profile modal** with
-  full CRM detail (email, phone, LinkedIn, role, seniority, engagement score, last
-  activity). The underlying modules:
+  **engagement KPI strip** stays glanceable up top, then a **widget grid** —
+  Account Snapshot and Stakeholder Map sit **side by side** (equal height; the
+  stakeholder list scrolls when long), with Deal Overview, Activity & Engagement,
+  and Content Hub **stacked full-width** below. Every panel is
+  **collapsible** (state per browser). Each stakeholder is **clickable → a profile
+  modal** with full CRM detail (email, phone, LinkedIn, role, seniority,
+  engagement score, last activity). The underlying modules:
   - **A — Account Snapshot**: account + enrichment context, degrades gracefully
-    when fields or enrichment are missing.
+    when fields or enrichment are missing. Leads with a one-line **deal cue** —
+    the primary opportunity's stage, amount, and close date — so anyone landing in
+    the room immediately sees who the company is *and* where the deal stands.
   - **B — Stakeholder Map**: contacts with the Champion highlighted, the primary
     contact starred, each colored by the CRM `engagement_score` (labeled "CRM
     score" so it's never confused with live in-room activity). Includes name search
     and a role / minimum-CRM-score filter.
-  - **C — Content Hub**: curated resources grouped by category, with an embedded,
-    click-to-play YouTube player for videos.
+  - **C — Content Hub**: curated resources organized by category, with an embedded
+    YouTube player for videos (a "▶ Preview" on each seller card; full poster on
+    the buyer side). See the Kanban details below.
   - **D — Deal Overview**: the CRM pipeline for the account — each opportunity's
     stage (a stepper), amount, close date, days-in-stage, owner, next step,
     products, and competitors, plus a pipeline total. Its own panel, separate from
@@ -52,12 +59,22 @@ The Content Hub is an editable **Kanban board** (P4): each content category is a
 column (fixed canonical order, shown even when empty), and resources are cards.
 The rep **drags a card within a column to reorder** it and **drags it to another
 column to recategorize** — one gesture does both (`@dnd-kit` multi-container, with
-a drag overlay and shuffle animation). Hide/Unhide toggles per card. Category is a
-per-room override (`room_resources.category`, falling back to the CRM category),
-so re-categorizing never touches the shared catalog. All edits are optimistic and
-persist via server actions (one flattened order write + a category write when a
-card changes column); the buyer's view groups by the same effective category and
-order on next load.
+a drag overlay and shuffle animation). Per card: **Hide/Unhide** and, for videos,
+an inline **▶ Preview** that opens the player without leaving the builder
+(untracked — it's the rep previewing, not buyer engagement). Per column: an **eye
+toggle** to **hide a whole category** from the buyer (the column dims and labels
+itself "Hidden from buyer"; cards stay editable). Category is a per-room override
+(`room_resources.category`), falling back to each item's **dedicated buyer-facing
+category** and then the CRM's own — so re-categorizing never touches the shared
+catalog. All edits are optimistic and persist via server actions; the buyer's view
+groups by the same effective category and order on next load.
+
+**Content categories.** The buyer-facing taxonomy is Custom Proposal · Secureframe
+Overview & Our Team · Product Demos · Getting Started with Your Trial · Case
+Studies · Integration Documentation. Each CRM content item is delegated to one of
+these by default (the seller can override per room). On the buyer page each
+category is a card with its own icon + tinted logo; a **category with nothing
+visible — hidden, or all its cards hidden — simply doesn't render**.
 
 **Internal notes (rep-only).** A floating comment button at the bottom-right of the
 room opens a Google-Docs-style notes pane (`room_notes`). Each note is attributed
@@ -77,12 +94,17 @@ by the CRM's own 403 scoping, not a parallel ACL), **not published yet** (draft)
 or the **room** itself. Hidden resources are filtered server-side, so they never
 reach the browser.
 
-The room follows the provided design: a slim Secureframe top bar, a
+The room follows the provided design: a slim Secureframe top bar with a working
+**Share** button (native share sheet where available, else copy-the-room-link —
+handy for a buyer looping in a colleague; access stays CRM-scoped), a
 dark→bright-green hero with the welcome and a "Have a question?" rep card, a tab
 bar (Resources active; the other tabs are out of scope), and a **two-level
-Resources experience** — a category grid that drills into a per-category list.
-Every consumption action emits an **identity-attributed event** that appears in
-the rep's feed (e.g., "Sarah watched Product Demo for 42 seconds"):
+Resources experience** — a category grid (icon + tinted logo per category) that
+drills into a per-category list. Videos open in a **Google-style player modal**
+(back arrow, YouTube source + pill, description) that embeds the YouTube IFrame
+API for real playback and event tracking, with a plain-embed fallback. Every
+consumption action emits an **identity-attributed event** that appears in the
+rep's feed (e.g., "Sarah watched Product Demo for 42 seconds"):
 
 | Event | Fires when | Dedup |
 | ----- | ---------- | ----- |
@@ -220,6 +242,10 @@ All passwords are `demo1234`.
 | `p.sharma@velorahealth.com`    | buyer | Velora Health (acc_002)        |
 | `e.rodriguez@velorahealth.com` | buyer | Velora Health (acc_002)        |
 
+> Both sign-in forms (the home popover and the room login prompt) surface these as
+> one-click **quick-fill chips**, grouped into reps and buyers, so the app is easy
+> to evaluate.
+
 > Rep and buyer sessions share one cookie. To exercise both roles at once, use
 > two browsers or an incognito window.
 
@@ -261,9 +287,12 @@ analysis (and shown in the feed tagged "preview"). The feed re-renders via
 shortly after the rep looks back at the tab. All ordering uses server time, and a
 fresh room renders empty states rather than dividing by zero.
 
-The engagement section also includes an **Analytics** summary — an activity-type
-breakdown (inline bars), top resources, and top people — and the activity feed
-**scrolls** within a fixed height so a busy room doesn't stretch the page.
+The engagement section also includes an **Analytics** summary, built dependency-
+free (inline SVG/CSS, no chart library) around the questions a rep actually has:
+an **activity trend line** over the retained window (momentum — warming vs
+cooling), a **content category-mix donut** (a stage signal), and **ranked top-3
+people and resources**. The activity feed **scrolls** within a fixed height so a
+busy room doesn't stretch the page.
 
 **Event retention.** To keep storage bounded, events are pruned on insert: anything
 older than `EVENT_RETENTION_DAYS` (7) is deleted, and each room keeps at most
@@ -314,7 +343,12 @@ npm run seed
 - [x] Read-only CRM confirmed (only non-GET CRM call is auth/login — static-checked in `test-p0.sh`)
 - [x] Empty states (fresh room, no enrichment, no events) don't crash
 - [x] 401 / 403 / 404 paths show friendly UI (login prompt, not-authorized, not-published, /forbidden)
-- [x] Reorder + hide persist and reflect in the buyer view
+- [x] Resource hide, category hide, and recategorize persist and reflect in the buyer view
+- [x] Hidden / empty categories don't render on the buyer page
+- [x] Video plays in the modal player (buyer) and the inline Preview (seller)
+- [x] Internal notes: add, tag-to-section jump, delete/clear, unread badge
+- [x] Account favorites (star, double-click, favorites-only filter) persist
+- [x] Buyer Share button copies the room link / opens the share sheet
 - [ ] Loom / walkthrough recorded (do this last, on your machine)
 
 > The one path not covered by the sandbox test suite is **live in-browser video
@@ -350,7 +384,8 @@ npm run seed
 ## Third-party libraries
 
 - **next / react** — App Router framework and UI.
-- **better-sqlite3** — synchronous embedded SQLite for rooms, resources, events.
+- **better-sqlite3** — synchronous embedded SQLite for rooms, resources, notes,
+  and events.
 - **jose** — decode the CRM JWT to read the current user from the session cookie.
 - **tailwindcss** — styling.
 - **@dnd-kit/core · sortable · utilities** — drag-and-drop reordering of room

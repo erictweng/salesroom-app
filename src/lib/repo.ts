@@ -167,6 +167,30 @@ export function setSectionOrder(roomId: number, keys: string[] | null): void {
     .run(keys ? JSON.stringify(keys) : null, roomId);
 }
 
+/**
+ * Save the per-room hidden categories (array of category names). Their resources
+ * are excluded from the buyer view. Pass null/[] to clear.
+ */
+export function setHiddenCategories(
+  roomId: number,
+  categories: string[] | null,
+): void {
+  getDb()
+    .prepare("UPDATE rooms SET hidden_categories = ? WHERE id = ?")
+    .run(categories && categories.length ? JSON.stringify(categories) : null, roomId);
+}
+
+/** Parse the hidden_categories JSON column into a string array (empty if absent/invalid). */
+export function parseHiddenCategories(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 /** Save the room's rep-only internal notes (legacy single-field; kept for back-compat). */
 export function setInternalNotes(roomId: number, notes: string): void {
   getDb()

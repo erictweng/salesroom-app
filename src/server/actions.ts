@@ -12,6 +12,8 @@ import {
   setResourceOrder,
   setResourceCategory,
   setSectionOrder,
+  setHiddenCategories,
+  parseHiddenCategories,
   addNote,
   deleteNote,
   clearNotes,
@@ -93,6 +95,26 @@ export async function setResourceCategoryAction(
   const room = getRoomBySlug(slug);
   if (!room || !contentId) return;
   setResourceCategory(room.id, contentId, category);
+}
+
+/**
+ * Hide or show a whole category for this room (rep-only). A hidden category's
+ * resources are excluded from the buyer view (and the empty category then drops
+ * off the buyer page). Optimistic; no revalidate.
+ */
+export async function setCategoryHiddenAction(
+  slug: string,
+  category: string,
+  hidden: boolean,
+): Promise<void> {
+  requireRep();
+  if (!category) return;
+  const room = getRoomBySlug(slug);
+  if (!room) return;
+  const current = new Set(parseHiddenCategories(room.hidden_categories));
+  if (hidden) current.add(category);
+  else current.delete(category);
+  setHiddenCategories(room.id, [...current]);
 }
 
 /** Show/hide a resource (rep-only). Hidden resources are excluded for buyers. */

@@ -28,6 +28,7 @@ import {
   setResourceOrderAction,
   setResourceCategoryAction,
   toggleResourceHiddenAction,
+  setCategoryHiddenAction,
 } from "@/server/actions";
 import { Badge, type BadgeTone } from "@/components/ui/Badge";
 import { contentTypeLabel } from "@/lib/format";
@@ -99,9 +100,11 @@ const collisionStrategy: CollisionDetection = (args) => {
 export function ContentManager({
   slug,
   resources,
+  hiddenCategories = [],
 }: {
   slug: string;
   resources: ResourceWithContent[];
+  hiddenCategories?: string[];
 }) {
   const columns = useMemo(
     () =>
@@ -114,6 +117,26 @@ export function ContentManager({
   const [board, setBoard] = useState<Board>(() => buildBoard(resources, columns));
   const [activeId, setActiveId] = useState<string | null>(null);
   const startColumn = useRef<string | null>(null);
+
+  // Hidden categories (optimistic). Re-synced from props when the saved set changes.
+  const [hiddenCols, setHiddenCols] = useState<Set<string>>(
+    () => new Set(hiddenCategories),
+  );
+  const hiddenSig = [...hiddenCategories].sort().join("|");
+  useEffect(() => {
+    setHiddenCols(new Set(hiddenCategories));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hiddenSig]);
+
+  function onToggleCategoryHidden(category: string, hidden: boolean) {
+    setHiddenCols((prev) => {
+      const next = new Set(prev);
+      if (hidden) next.add(category);
+      else next.delete(category);
+      return next;
+    });
+    void setCategoryHiddenAction(slug, category, hidden);
+  }
 
   const signature = useMemo(
     () =>
@@ -249,7 +272,9 @@ export function ContentManager({
               key={col}
               id={col}
               items={board[col] ?? []}
+              hidden={hiddenCols.has(col)}
               onToggleHide={onToggleHide}
+              onToggleCategoryHidden={onToggleCategoryHidden}
             />
           ))}
         </div>
@@ -264,24 +289,54 @@ export function ContentManager({
 function Column({
   id,
   items,
+  hidden,
   onToggleHide,
+  onToggleCategoryHidden,
 }: {
   id: string;
   items: Item[];
+  hidden: boolean;
   onToggleHide: (id: string, hidden: boolean) => void;
+  onToggleCategoryHidden: (category: string, hidden: boolean) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div className="flex w-64 shrink-0 flex-col">
-      <div className="mb-2 flex items-center justify-between px-1">
-        <h3 className="text-sm font-semibold text-slate-700">{id}</h3>
+      <div className="mb-2 flex items-center gap-2 px-1">
+        <h3
+          className={`truncate text-sm font-semibold ${
+            hidden ? "text-slate-400" : "text-slate-700"
+          }`}
+          title={id}
+        >
+          {id}
+        </h3>
         <span className="text-xs text-slate-400">{items.length}</span>
+        <button
+          type="button"
+          onClick={() => onToggleCategoryHidden(id, !hidden)}
+          aria-pressed={hidden}
+          aria-label={
+            hidden ? `Show ${id} to buyers` : `Hide ${id} from buyers`
+          }
+          title={hidden ? "Hidden from buyer — click to show" : "Hide category from buyer"}
+          className={`ml-auto rounded p-1 transition hover:bg-slate-200 ${
+            hidden ? "text-amber-600" : "text-slate-400 hover:text-slate-700"
+          }`}
+        >
+          {hidden ? <EyeOffIcon /> : <EyeIcon />}
+        </button>
       </div>
+      {hidden && (
+        <p className="mb-1 px-1 text-[10px] font-medium uppercase tracking-wide text-amber-600">
+          Hidden from buyer
+        </p>
+      )}
       <div
         ref={setNodeRef}
         className={`min-h-[80px] flex-1 space-y-2 rounded-lg p-2 transition ${
           isOver ? "bg-brand-50 ring-1 ring-brand-300" : "bg-slate-50"
-        }`}
+        } ${hidden ? "opacity-60" : ""}`}
       >
         <SortableContext
           items={items.map((i) => i.content_id)}
@@ -386,5 +441,22 @@ function CardFace({
         )}
       </div>
     </div>
+  );
+}
+
+function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+function EyeOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+      <path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c6.5 0 10 7 10 7a18 18 0 0 1-2.4 3.4M6.1 6.1A18 18 0 0 0 2 12s3.5 7 10 7a10.9 10.9 0 0 0 4.1-.8M3 3l18 18M9.5 9.5a3 3 0 0 0 4.2 4.2" />
+    </svg>
   );
 }
