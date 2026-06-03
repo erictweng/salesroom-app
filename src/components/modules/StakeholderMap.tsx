@@ -190,15 +190,15 @@ export function StakeholderMap({ contacts }: { contacts: Contact[] }) {
           }
         />
       ) : (
-        <ul className="max-h-96 divide-y divide-slate-100 overflow-y-auto">
+        <ul className="max-h-[34rem] divide-y divide-slate-100 overflow-y-auto">
           {rows.map((c) => {
             const isChampion = c.role === "Champion";
             return (
               <li key={c.id}>
                 <button
                   onClick={() => setSelected(c)}
-                  className={`flex w-full items-center gap-3 py-3 text-left transition hover:bg-slate-50 ${
-                    isChampion ? "-mx-2 rounded-lg bg-brand-50/60 px-2" : ""
+                  className={`-mx-2 flex w-full items-center gap-3 rounded-lg px-2 py-3 text-left transition hover:bg-slate-50 ${
+                    isChampion ? "bg-brand-50/60" : ""
                   }`}
                 >
                   <Avatar first={c.first_name} last={c.last_name} />
@@ -212,7 +212,6 @@ export function StakeholderMap({ contacts }: { contacts: Contact[] }) {
                           ★
                         </span>
                       )}
-                      {isChampion && <Badge tone="green">Champion</Badge>}
                     </div>
                     <p className="truncate text-sm text-slate-500">
                       {c.title || "—"}
