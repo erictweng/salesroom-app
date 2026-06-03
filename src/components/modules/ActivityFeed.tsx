@@ -33,8 +33,14 @@ function describe(e: EventRecord, titles: Record<string, string>): string {
     case "VIDEO_PLAYED":
       return `${who} started watching ${title}`;
     case "VIDEO_PROGRESS":
+      // Lead with the milestone percent — it's unique per event (25/50/75), so two
+      // milestones crossed in the same second don't render as identical lines. Keep
+      // the watch-time as flavor when present.
+      if (pct != null)
+        return secs != null
+          ? `${who} watched ${pct}% of ${title} (${secs}s in)`
+          : `${who} watched ${pct}% of ${title}`;
       if (secs != null) return `${who} watched ${title} for ${secs} seconds`;
-      if (pct != null) return `${who} watched ${pct}% of ${title}`;
       return `${who} watched ${title}`;
     case "VIDEO_COMPLETED":
       return `${who} finished ${title}`;
